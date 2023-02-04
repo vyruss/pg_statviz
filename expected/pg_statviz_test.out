@@ -1,0 +1,16 @@
+CREATE EXTENSION pg_statviz;
+SELECT 1 FROM pgstatviz.snapshot();
+NOTICE:  created pg_statviz snapshot
+ ?column? 
+----------
+        1
+(1 row)
+
+SELECT count(*)
+    FROM pgstatviz.conn t
+    JOIN pgstatviz.snapshots s USING (snapshot_tstamp);
+ count 
+-------
+     1
+(1 row)
+

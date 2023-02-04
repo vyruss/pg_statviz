@@ -1,0 +1,13 @@
+#!/usr/bin/env python3
+"""
+pg_statviz - stats visualization and time series analysis
+"""
+
+__author__ = "Jimmy Angelakos"
+__copyright__ = "Copyright (c) 2023 Jimmy Angelakos"
+__license__ = "PostgreSQL License"
+__version__ = "0.1"
+
+from pg_statviz.pg_statviz import main
+
+main()
