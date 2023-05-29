@@ -1,4 +1,5 @@
 """
+
 pg_statviz - stats visualization and time series analysis
 """
 
@@ -9,7 +10,7 @@ __license__ = "PostgreSQL License"
 import argparse
 import getpass
 import logging
-import psycopg2
+import psycopg2.extensions, psycopg2.extras
 from argh.decorators import arg
 from dateutil.parser import isoparse
 from matplotlib.ticker import MaxNLocator
