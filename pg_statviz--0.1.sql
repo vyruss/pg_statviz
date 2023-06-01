@@ -280,7 +280,10 @@ AS $$
         PERFORM @extschema@.snapshot_conn(ts);
         PERFORM @extschema@.snapshot_db(ts);
         PERFORM @extschema@.snapshot_wait(ts);
-        PERFORM @extschema@.snapshot_wal(ts);
+        -- snapshot_wal function is only available in 15+
+        IF (SELECT current_setting('server_version_num')::int >= 150000) THEN
+            PERFORM @extschema@.snapshot_wal(ts);
+        END IF;
         RAISE NOTICE 'created pg_statviz snapshot';
         RETURN ts;
     END
