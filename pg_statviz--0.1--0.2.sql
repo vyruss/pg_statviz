@@ -1,13 +1,10 @@
 -- complain if script is sourced in psql, rather than via ALTER EXTENSION
-\echo Use "ALTER EXTENSION pg_statviz UPDATE TO 1.2" to load this file. \quit
-
-CREATE OR REPLACE FUNCTION @extschema@.snapshot_conf(snapshot_tstamp timestamptz)
-RETURNS void
-AS $$
+\echo USE "ALTER EXTENSION pg_statviz UPDATE TO 1.2" TO LOAD this file. \quit
+CREATE OR REPLACE FUNCTION @extschema@.snapshot_conf(snapshot_tstamp timestamptz) RETURNS void AS $$
     INSERT INTO @extschema@.conf (
       snapshot_tstamp,
       conf)
-    SELECT 
+    SELECT
       snapshot_tstamp,
       jsonb_agg(s)
     FROM (
@@ -33,3 +30,22 @@ AS $$
             'server_version_num',
             'shared_buffers')) s;
 $$ LANGUAGE SQL;
+
+-- server uptime
+CREATE TABLE IF NOT EXISTS @extschema@.uptime
+    (
+      snapshot_tstamp timestamptz REFERENCES @extschema@.snapshots(snapshot_tstamp) ON DELETE CASCADE PRIMARY KEY,
+      uptime bigint);
+
+CREATE OR REPLACE FUNCTION @extschema@.snapshot_uptime(snapshot_tstamp timestampz) 
+  RETURNS void
+  AS $$
+    INSERT INTO @extschema@.uptime (
+      snapshot_tstamp,
+      uptime)
+    SELECT
+      snapshot_tstamp,
+      extract(epoch from current_timestamp - pg_postmaster_start_time())::bigint as uptime;
+  $$ LANGUAGE SQL;
+
+  
