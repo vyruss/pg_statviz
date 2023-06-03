@@ -48,7 +48,7 @@ CREATE OR REPLACE FUNCTION @extschema@.snapshot_uptime(snapshot_tstamp timestamp
       extract(epoch from current_timestamp - pg_postmaster_start_time())::bigint as uptime;
   $$ LANGUAGE SQL;
 
-  
+
 -- Locks
 CREATE TABLE IF NOT EXISTS @extschema@.lock(
     snapshot_tstamp timestamptz REFERENCES @extschema@.snapshots(snapshot_tstamp) ON DELETE CASCADE PRIMARY KEY,
@@ -93,3 +93,53 @@ AS $$
     count(*) FILTER (WHERE mode = 'AccessExclusiveLock') as lock_access_ex
   FROM pgl;
 $$ LANGUAGE SQL;
+
+-- User tables
+CREATE TABLE IF NOT EXISTS @extschema@.table (
+  snapshot_tstamp timestamptz REFERENCES @extschema@.snapshots(snapshot_tstamp) ON DELETE CASCADE PRIMARY KEY,
+  cnt_tables int,
+  tables jsonb);
+
+
+CREATE OR REPLACE FUNCTION @extschema@.snapshot_table (snapshot_tstamp timestamptz)
+RETURNS VOID
+AS $$
+  WITH 
+    pgtb AS (
+      SELECT 
+        a.relname,
+        a.schemaname,
+        coalesce(b.heap_blks_read,0) as heap_blks_read,
+        coalesce(b.heap_blks_hit,0) as heap_blks_hit,
+        coalesce(b.idx_blks_read,0) as idx_blks_read,
+        coalesce(b.idx_blks_hit,0) as idx_blks_hit,
+        coalesce(b.toast_blks_read,0) as toast_blks_read,
+        coalesce(b.toast_blks_hit,0) as toast_blks_hit,
+        coalesce(a.seq_scan,0) as seq_scan,
+        coalesce(a.seq_tup_read,0) as seq_tup_read,
+        coalesce(a.idx_scan,0) as idx_scan,
+        coalesce(a.idx_tup_fetch,0) as idx_tup_fetch,
+        coalesce(a.n_tup_ins,0) as n_tup_ins,
+        coalesce(a.n_tup_upd,0) as n_tup_upd,
+        coalesce(a.n_tup_del,0) as n_tup_del,
+        coalesce(a.n_live_tup,0) as n_live_tup,
+        coalesce(a.n_dead_tup,0) as n_dead_tup,
+        coalesce(a.vacuum_count,0) as vacuum_count,
+        coalesce(a.autovacuum_count,0) as autovacuum_count,
+        coalesce(a.analyze_count,0) as analyze_count,
+        coalesce(a.autoanalyze_count,0) as autoanalyze_count,
+        pg_relation_size(a.relid) as size
+      FROM
+        pg_stat_user_tables AS a INNER JOIN pg_statio_user_tables AS b
+      ON a.relid=b.relid)
+    INSERT INTO @extschema@.table_desc (
+      snapshot_tstamp,
+      cnt_tables,
+      tables)
+    SELECT
+      snapshot_tstamp,
+      count(*),
+      coalesce(jsonb_agg(pgtb),'[]'::jsonb)
+    FROM pgtb;
+$$ LANGUAGE SQL;
+
