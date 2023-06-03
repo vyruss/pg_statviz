@@ -95,7 +95,7 @@ AS $$
 $$ LANGUAGE SQL;
 
 -- User tables
-CREATE TABLE IF NOT EXISTS @extschema@.table (
+CREATE TABLE IF NOT EXISTS @extschema@.user_table (
   snapshot_tstamp timestamptz REFERENCES @extschema@.snapshots(snapshot_tstamp) ON DELETE CASCADE PRIMARY KEY,
   cnt_tables int,
   tables jsonb);
@@ -107,8 +107,8 @@ AS $$
   WITH 
     pgtb AS (
       SELECT 
-        a.relname,
-        a.schemaname,
+        a.relname as table_name,
+        a.schemaname as schema_name,
         coalesce(b.heap_blks_read,0) as heap_blks_read,
         coalesce(b.heap_blks_hit,0) as heap_blks_hit,
         coalesce(b.idx_blks_read,0) as idx_blks_read,
@@ -132,7 +132,7 @@ AS $$
       FROM
         pg_stat_user_tables AS a INNER JOIN pg_statio_user_tables AS b
       ON a.relid=b.relid)
-    INSERT INTO @extschema@.table_desc (
+    INSERT INTO @extschema@.user_table (
       snapshot_tstamp,
       cnt_tables,
       tables)
