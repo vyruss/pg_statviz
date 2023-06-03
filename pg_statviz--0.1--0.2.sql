@@ -143,3 +143,39 @@ AS $$
     FROM pgtb;
 $$ LANGUAGE SQL;
 
+-- User indexes
+
+
+CREATE TABLE IF NOT EXISTS @extschema@.user_index (
+  snapshot_tstamp timestamptz REFERENCES @extschema@.snapshots(snapshot_tstamp) ON DELETE CASCADE PRIMARY KEY,
+  cnt_index int,
+  indexes jsonb);
+
+CREATE OR REPLACE FUNCTION @extschema@.snapshot_index (snapshot_tstamp timestamptz)
+RETURNS VOID
+AS $$
+  WITH 
+    pgidx AS (
+      SELECT 
+        a.relname as table_name,
+        a.schemaname as schema_name,
+        a.indexrelname as index_name, 
+        coalesce(a.idx_scan,0) as idx_scan,
+        coalesce(a.idx_tup_read,0) as idx_tup_read,
+        coalesce(a.idx_tup_fetch,0) as idx_tup_fetch,
+        coalesce(b.idx_blks_read,0) as idx_blks_read,
+        coalesce(b.idx_blks_hit,0) as idx_blks_hit,
+        pg_indexes_size(a.indexrelid) as size
+      FROM
+        pg_stat_user_indexes AS a INNER JOIN pg_statio_user_indexes AS b
+      ON a.indexrelid=b.indexrelid)
+    INSERT INTO @extschema@.user_index (
+      snapshot_tstamp,
+      cnt_index,
+      indexes)
+    SELECT
+      snapshot_tstamp,
+      count(*),
+      coalesce(jsonb_agg(pgidx),'[]'::jsonb)
+    FROM pgidx;
+$$ LANGUAGE SQL;
