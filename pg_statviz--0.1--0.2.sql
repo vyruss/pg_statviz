@@ -1,5 +1,6 @@
 -- complain if script is sourced in psql, rather than via ALTER EXTENSION
 \echo USE "ALTER EXTENSION pg_statviz UPDATE TO 1.2" TO LOAD this file. \quit
+
 CREATE OR REPLACE FUNCTION @extschema@.snapshot_conf(snapshot_tstamp timestamptz) RETURNS void AS $$
     INSERT INTO @extschema@.conf (
       snapshot_tstamp,
@@ -37,7 +38,7 @@ CREATE TABLE IF NOT EXISTS @extschema@.uptime
       snapshot_tstamp timestamptz REFERENCES @extschema@.snapshots(snapshot_tstamp) ON DELETE CASCADE PRIMARY KEY,
       uptime bigint);
 
-CREATE OR REPLACE FUNCTION @extschema@.snapshot_uptime(snapshot_tstamp timestampz) 
+CREATE OR REPLACE FUNCTION @extschema@.snapshot_uptime(snapshot_tstamp timestamptz) 
   RETURNS void
   AS $$
     INSERT INTO @extschema@.uptime (
@@ -62,7 +63,7 @@ CREATE TABLE IF NOT EXISTS @extschema@.lock(
     lock_ex int,
     lock_access_ex int);
 
-CREATE OR REPLACE FUNCTION @extschema@.snapshot_lock(snapshot_tstamp timestampz)
+CREATE OR REPLACE FUNCTION @extschema@.snapshot_lock(snapshot_tstamp timestamptz)
 RETURNS VOID
 AS $$
   WITH
@@ -179,3 +180,31 @@ AS $$
       coalesce(jsonb_agg(pgidx),'[]'::jsonb)
     FROM pgidx;
 $$ LANGUAGE SQL;
+
+
+-- update snapshots function
+CREATE OR REPLACE FUNCTION @extschema@.snapshot()
+RETURNS timestamptz
+AS $$
+    DECLARE ts timestamptz;
+    BEGIN
+        ts := clock_timestamp();
+        INSERT INTO @extschema@.snapshots
+        VALUES (ts);
+        PERFORM @extschema@.snapshot_buf(ts);
+        PERFORM @extschema@.snapshot_conf(ts);
+        PERFORM @extschema@.snapshot_conn(ts);
+        PERFORM @extschema@.snapshot_db(ts);
+        PERFORM @extschema@.snapshot_wait(ts);
+        -- snapshot_wal function is only available in 15+
+        IF (SELECT current_setting('server_version_num')::int >= 150000) THEN
+            PERFORM @extschema@.snapshot_wal(ts);
+        END IF;
+        PERFORM @extschema@.snapshot_uptime(ts);
+        PERFORM @extschema@.snapshot_lock(ts);
+        PERFORM @extschema@.snapshot_table(ts);
+        PERFORM @extschema@.snapshot_index(ts);
+        RAISE NOTICE 'created pg_statviz snapshot';
+        RETURN ts;
+    END
+$$ LANGUAGE PLPGSQL;
