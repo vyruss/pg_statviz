@@ -166,7 +166,7 @@ AS $$
         coalesce(a.idx_tup_fetch,0) as idx_tup_fetch,
         coalesce(b.idx_blks_read,0) as idx_blks_read,
         coalesce(b.idx_blks_hit,0) as idx_blks_hit,
-        pg_indexes_size(a.indexrelid) as size
+        pg_relation_size(a.indexrelid) as size
       FROM
         pg_stat_user_indexes AS a INNER JOIN pg_statio_user_indexes AS b
       ON a.indexrelid=b.indexrelid)
