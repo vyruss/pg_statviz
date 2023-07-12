@@ -26,13 +26,27 @@ AS $$
                "setting" AS "value"
         FROM pg_settings
         WHERE "name" IN (
+            'autovacuum',
+            'autovacuum_max_workers',
+            'autovacuum_naptime',
+            'autovacuum_work_mem',
             'bgwriter_delay',
             'bgwriter_lru_maxpages',
             'bgwriter_lru_multiplier',
             'checkpoint_completion_target',
             'checkpoint_timeout',
             'max_connections',
-            'max_wal_size')) s;
+            'max_wal_size',
+            'max_wal_senders',
+            'work_mem',
+            'maintenance_work_mem',
+            'max_replication_slots',
+            'max_parallel_workers',
+            'max_parallel_maintenance_workers',
+            'server_version_num',
+            'shared_buffers',
+            'vacuum_cost_delay',
+            'vacuum_cost_limit')) s;
 $$ LANGUAGE SQL;
 
 
@@ -229,7 +243,8 @@ CREATE TABLE IF NOT EXISTS @extschema@.db(
     tup_deleted bigint,
     temp_files bigint,
     temp_bytes bigint,
-    stats_reset timestamptz);
+    stats_reset timestamptz,
+    postmaster_start_time timestamptz);
 
 CREATE OR REPLACE FUNCTION @extschema@.snapshot_db(snapshot_tstamp timestamptz)
 RETURNS void
@@ -247,7 +262,8 @@ AS $$
             tup_deleted,
             temp_files,
             temp_bytes,
-            stats_reset)
+            stats_reset,
+            postmaster_start_time)
         SELECT
             snapshot_tstamp,
             xact_commit,
@@ -261,7 +277,8 @@ AS $$
             tup_deleted,
             temp_files,
             temp_bytes,
-            stats_reset
+            stats_reset,
+            pg_postmaster_start_time()
         FROM pg_stat_database
         WHERE datname = current_database();
 $$ LANGUAGE SQL;
