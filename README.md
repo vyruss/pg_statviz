@@ -117,7 +117,7 @@ pg_statviz --help
 ```
 usage: pg_statviz [--help] [--version] [-d DBNAME] [-h HOSTNAME] [-p PORT] [-U USERNAME] [-W]
                   [-D FROM TO] [-O OUTPUTDIR]
-                  {analyze,buf,cache,checkp,conn,tuple,wait,wal} ...
+                  {analyze,buf,cache,checkp,conn,lock,tuple,wait,wal} ...
 
 run all analysis modules
 
@@ -128,6 +128,7 @@ positional arguments:
     cache               run cache hit ratio analysis module
     checkp              run checkpoint analysis module
     conn                run connection count analysis module
+    lock                run locks analysis module
     tuple               run tuple count analysis module
     wait                run wait events analysis module
     wal                 run WAL generation analysis module
