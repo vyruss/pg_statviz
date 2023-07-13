@@ -146,6 +146,40 @@ AS $$
 $$ LANGUAGE SQL;
 
 
+-- Locks
+CREATE TABLE IF NOT EXISTS @extschema@.lock(
+    snapshot_tstamp timestamptz REFERENCES @extschema@.snapshots(snapshot_tstamp) ON DELETE CASCADE PRIMARY KEY,
+    locks_total int,
+    locks jsonb);
+
+CREATE OR REPLACE FUNCTION @extschema@.snapshot_lock(snapshot_tstamp timestamptz)
+RETURNS void
+AS $$
+    WITH
+        pgl AS (
+            SELECT *
+            FROM pg_locks l, pg_database d
+            WHERE d.datname = current_database()
+            AND l.database = oid
+            AND locktype = 'relation'),
+        lcks AS (
+            SELECT coalesce(jsonb_agg(l), '[]'::jsonb)
+            FROM (
+                SELECT mode AS lock_mode, count(*) AS lock_count
+                FROM pgl
+                GROUP BY lock_mode) l)
+    INSERT INTO @extschema@.lock (
+        snapshot_tstamp,
+        locks_total,
+        locks)
+    SELECT
+        snapshot_tstamp,
+        count(*) AS locks_total,
+        (SELECT * from lcks) AS locks
+    FROM pgl;
+$$ LANGUAGE SQL;
+
+
 -- Wait events
 CREATE TABLE IF NOT EXISTS @extschema@.wait(
     snapshot_tstamp timestamptz REFERENCES @extschema@.snapshots(snapshot_tstamp) ON DELETE CASCADE PRIMARY KEY,
@@ -297,6 +331,7 @@ AS $$
         PERFORM @extschema@.snapshot_conf(ts);
         PERFORM @extschema@.snapshot_conn(ts);
         PERFORM @extschema@.snapshot_db(ts);
+        PERFORM @extschema@.snapshot_lock(ts);
         PERFORM @extschema@.snapshot_wait(ts);
         -- pg_stat_wal only exists in PG15+
         IF (SELECT current_setting('server_version_num')::int >= 150000) THEN

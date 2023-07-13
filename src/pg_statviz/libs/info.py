@@ -7,7 +7,7 @@ __copyright__ = "Copyright (c) 2023 Jimmy Angelakos"
 __license__ = "PostgreSQL License"
 
 import logging
-import psycopg2.errors
+from psycopg2.errors import ExternalRoutineException, InsufficientPrivilege
 
 
 logging.basicConfig()
