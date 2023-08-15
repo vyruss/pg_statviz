@@ -40,7 +40,7 @@ pip install pg_statviz
 
 ### Requirements
 
-Python 3.7+ is required for the visualization utility.
+Python 3.9+ is required for the visualization utility.
 
 ## Usage
 

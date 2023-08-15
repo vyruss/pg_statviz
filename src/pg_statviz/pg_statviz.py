@@ -22,7 +22,7 @@ from pg_statviz.modules.wal import wal
 
 
 # Python version check
-if sys.version_info < (3, 7):
+if sys.version_info < (3, 9):
     raise SystemExit("This program requires Python 3.7 or later")
 
 
