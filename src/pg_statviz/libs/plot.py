@@ -13,15 +13,15 @@ import matplotlib.font_manager as fnt
 
 def setup():
     for f in ["NotoSans-Regular.ttf", "NotoSans-SemiBold.ttf"]:
-        f = importlib.resources.path("pg_statviz.libs", f)
+        f = importlib.resources.files("pg_statviz.libs").joinpath(f)
         fnt.fontManager.addfont(f)
     plt.rcParams['font.family'] = 'Noto Sans'
     plt.rcParams['font.size'] = 12
-    im = plt.imread(importlib.resources.path("pg_statviz.libs",
-                                             "pg_statviz.png"))
+    base_image_path=importlib.resources.files("pg_statviz.libs").joinpath("pg_statviz.png")
+    im = plt.imread(str(base_image_path))
     height = im.shape[0]
     fig = plt.figure(figsize=(19.2, 10.8))
-    fig.figimage(im, 5, (fig.bbox.ymax - height - 6), zorder=3)
+    fig.figimage(im, 5, (fig.get_window_extent().ymin - height - 6), zorder=3)
     plt.grid(visible=True)
     plt.ticklabel_format(axis='y', style='plain')
     plt.gcf().autofmt_xdate()
@@ -31,10 +31,10 @@ def setup():
 def setupdouble():
     plt = setup()[0]
     fig, (splt1, splt2) = plt.subplots(2, figsize=(19.2, 10.8))
-    im = plt.imread(importlib.resources.path("pg_statviz.libs",
-                                             "pg_statviz.png"))
+    base_image_path=importlib.resources.files("pg_statviz.libs").joinpath("pg_statviz.png")
+    im = plt.imread(str(base_image_path))
     height = im.shape[0]
-    fig.figimage(im, 5, (fig.bbox.ymax - height - 6), zorder=3)
+    fig.figimage(im, 5, (fig.get_window_extent().ymin - height - 6), zorder=3)
     for s in [splt1, splt2]:
         s.grid(visible=True)
         s.ticklabel_format(axis='y', style='plain')
