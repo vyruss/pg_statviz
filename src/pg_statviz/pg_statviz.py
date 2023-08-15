@@ -6,7 +6,7 @@ pg_statviz - stats visualization and time series analysis
 __author__ = "Jimmy Angelakos"
 __copyright__ = "Copyright (c) 2023 Jimmy Angelakos"
 __license__ = "PostgreSQL License"
-__version__ = "0.2"
+__version__ = "0.3"
 
 import sys
 from argh import ArghParser
