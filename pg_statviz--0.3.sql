@@ -161,7 +161,8 @@ AS $$
             FROM pg_locks l, pg_database d
             WHERE d.datname = current_database()
             AND l.database = oid
-            AND locktype = 'relation'),
+            AND locktype = 'relation'
+            AND pid != pg_backend_pid()), -- ignore snapshot session
         lcks AS (
             SELECT coalesce(jsonb_agg(l), '[]'::jsonb)
             FROM (
