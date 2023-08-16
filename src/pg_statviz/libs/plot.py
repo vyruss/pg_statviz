@@ -21,7 +21,7 @@ def setup():
     im = plt.imread(str(base_image_path))
     height = im.shape[0]
     fig = plt.figure(figsize=(19.2, 10.8))
-    fig.figimage(im, 5, (fig.get_window_extent().ymin - height - 6), zorder=3)
+    fig.figimage(im, 5, (fig.bbox.ymax - height - 6), zorder=3)
     plt.grid(visible=True)
     plt.ticklabel_format(axis='y', style='plain')
     plt.gcf().autofmt_xdate()
@@ -34,7 +34,7 @@ def setupdouble():
     base_image_path=importlib.resources.files("pg_statviz.libs").joinpath("pg_statviz.png")
     im = plt.imread(str(base_image_path))
     height = im.shape[0]
-    fig.figimage(im, 5, (fig.get_window_extent().ymin - height - 6), zorder=3)
+    fig.figimage(im, 5, (fig.bbox.ymax - height - 6), zorder=3)
     for s in [splt1, splt2]:
         s.grid(visible=True)
         s.ticklabel_format(axis='y', style='plain')
