@@ -358,3 +358,4 @@ GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA @extschema@ TO pg_monitor;
 GRANT SELECT ON ALL TABLES IN SCHEMA @extschema@ TO pg_monitor;
 GRANT INSERT ON ALL TABLES IN SCHEMA @extschema@ TO pg_monitor;
 GRANT DELETE ON ALL TABLES IN SCHEMA @extschema@ TO pg_monitor;
+GRANT TRUNCATE ON ALL TABLES IN SCHEMA @extschema@ TO pg_monitor;

@@ -77,8 +77,9 @@ SELECT pgstatviz.delete_snapshots();
 NOTICE:  truncating table "snapshots"
 NOTICE:  truncate cascades to table "conf"
 NOTICE:  truncate cascades to table "buf"
-NOTICE:  truncate cascades to table "conn"
-NOTICE:  truncate cascades to table "wait"
+NOTICE:  truncate cascades to table "conn"     
+NOTICE:  truncate cascades to table "lock"
+NOTICE:  truncate cascades to table "wait"                
 NOTICE:  truncate cascades to table "wal"
 NOTICE:  truncate cascades to table "db"
  delete_snapshots 
