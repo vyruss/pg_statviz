@@ -1,3 +1,12 @@
+/*
+// pg_statviz - stats visualization and time series analysis
+//
+// Copyright (c) 2023 Jimmy Angelakos
+// This software is released under the PostgreSQL Licence
+//
+// pg_statviz--0.1 - Initial release
+*/
+
 -- complain if script is sourced in psql, rather than via CREATE EXTENSION
 \echo Use "CREATE EXTENSION pg_statviz" to load this file. \quit
 
