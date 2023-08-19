@@ -17,7 +17,8 @@ def setup():
         fnt.fontManager.addfont(f)
     plt.rcParams['font.family'] = 'Noto Sans'
     plt.rcParams['font.size'] = 12
-    base_image_path=importlib.resources.files("pg_statviz.libs").joinpath("pg_statviz.png")
+    base_image_path = importlib.resources.files("pg_statviz.libs")\
+        .joinpath("pg_statviz.png")
     im = plt.imread(str(base_image_path))
     height = im.shape[0]
     fig = plt.figure(figsize=(19.2, 10.8))
@@ -31,7 +32,8 @@ def setup():
 def setupdouble():
     plt = setup()[0]
     fig, (splt1, splt2) = plt.subplots(2, figsize=(19.2, 10.8))
-    base_image_path=importlib.resources.files("pg_statviz.libs").joinpath("pg_statviz.png")
+    base_image_path = importlib.resources.files("pg_statviz.libs")\
+        .joinpath("pg_statviz.png")
     im = plt.imread(str(base_image_path))
     height = im.shape[0]
     fig.figimage(im, 5, (fig.bbox.ymax - height - 6), zorder=3)
