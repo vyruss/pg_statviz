@@ -1,0 +1,52 @@
+{
+   "name": "pg_statviz",
+   "abstract": "PostgreSQL stats visualization over time",
+   "description": "pg_statviz is a minimalist extension and utility pair for time series analysis and visualization of PostgreSQL internal statistics.",
+   "version": "0.4.1",
+   "release_status": "testing",
+   "maintainer": "Jimmy Angelakos <jimmy.angelakos@enterprisedb.com>",
+   "license": {
+      "PostgreSQL": "https://www.postgresql.org/about/licence"
+   },
+   "prereqs": {
+      "runtime": {
+         "requires": {
+            "plpgsql": 0,
+            "PostgreSQL": "12.0.0"
+         },
+         "recommends": {
+            "PostgreSQL": "15.0.0"
+         }
+      }
+   },
+   "provides": {
+     "pg_statviz": {
+       "file": "pg_statviz--0.3--0.4.sql",
+       "docfile": "README.md",
+       "version": "0.4.0",
+       "abstract": "PostgreSQL stats visualization over time"
+     }
+   },
+   "resources": {
+      "homepage":  "https://github.com/vyruss/pg_statviz",
+      "repository": {
+        "url":  "https://github.com/vyruss/pg_statviz.git",
+        "web":  "https://github.com/vyruss/pg_statviz",
+        "type": "git"
+      }
+   },
+   "generated_by": "Jimmy Angelakos",
+   "meta-spec": {
+      "version": "1.0.0",
+      "url": "https://pgxn.org/meta/spec.txt"
+   },
+   "tags": [
+      "data visualization",
+      "database management",
+      "database administration",
+      "dataviz",
+      "performance analysis",
+      "time series",
+      "time series analysis"
+   ]
+}

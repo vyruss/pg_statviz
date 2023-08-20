@@ -50,6 +50,7 @@ a snapshot, e.g. from `psql`:
 ```sql
 SELECT pgstatviz.snapshot();
 ```
+
 ```sql
 NOTICE:  created pg_statviz snapshot
            snapshot
@@ -73,6 +74,7 @@ Or all snapshots can be removed like this:
 ```sql
 SELECT pgstatviz.delete_snapshots();
 ```
+
 ```sql
 NOTICE:  truncating table "snapshots"
 NOTICE:  truncate cascades to table "conf"
@@ -115,6 +117,7 @@ The visualization utility can be called like a PostgreSQL command line tool:
 ```shell
 pg_statviz --help
 ```
+
 ```
 usage: pg_statviz [--help] [--version] [-d DBNAME] [-h HOSTNAME] [-p PORT] [-U USERNAME] [-W]
                   [-D FROM TO] [-O OUTPUTDIR]
@@ -157,6 +160,7 @@ options:
 ```shell
 pg_statviz conn --help
 ```
+
 ```
 usage: pg_statviz conn [-h] [-d DBNAME] [--host HOSTNAME] [-p PORT] [-U USERNAME] [-W]
                        [-D FROM TO] [-O OUTPUTDIR] [-u [USERS ...]]
