@@ -31,10 +31,10 @@ from pg_statviz.libs.info import getinfo
 @arg('-O', '--outputdir', help="output directory")
 @arg('--info', help=argparse.SUPPRESS)
 @arg('--conn', help=argparse.SUPPRESS)
-def checkp(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
+def checkp_rate(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
            username=getpass.getuser(), password=False, daterange=[],
            outputdir=None, info=None, conn=None):
-    "run checkpoint analysis module"
+    "run checkpoint rate analysis module"
 
     MAX_RESULTS = 1000
 
@@ -50,7 +50,7 @@ def checkp(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     if not info:
         info = getinfo(conn)
 
-    _logger.info("Running checkpoint analysis")
+    _logger.info("Running checkpoint rate analysis")
 
     if daterange:
         daterange = [isoparse(d) for d in daterange]
@@ -72,28 +72,39 @@ def checkp(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
         raise SystemExit("No pg_statviz snapshots found in this database")
 
     tstamps = [t['snapshot_tstamp'] for t in data]
-    req = [c['checkpoints_req'] for c in data]
-    timed = [c['checkpoints_timed'] for c in data]
+    
+    # Checkpoint diff generator - yields tuple list of the rates in
+    # checkpoints/minute
+    def checkpdiff(data):
+        yield (numpy.nan, numpy.nan)
+        for i, item in enumerate(data):
+            if i + 1 < len(data):
+                if data[i + 1]['stats_reset'] == data[i]['stats_reset']:
+                    m = (data[i + 1]['snapshot_tstamp']
+                         - data[i]['snapshot_tstamp']).total_seconds() / 60
+                    yield (round((data[i + 1]['checkpoints_req']
+                                  - data[i]['checkpoints_req']) / m, 1),
+                           round((data[i + 1]['checkpoints_timed']
+                                  - data[i]['checkpoints_timed']) / m, 1))
+                else:
+                    yield (numpy.nan, numpy.nan)
+    checkprates = list(checkpdiff(data))
 
-    # Plot checkpoints
+    # Plot checkpoint rates
     plt, fig = plot.setup()
     plt.suptitle(f"pg_statviz · {info['hostname']}:{port}",
                  fontweight='semibold')
-    plt.title("Checkpoints")
-
-    plt.plot_date(tstamps, req, label="Requested", aa=True,
-                  linestyle='solid')
-    plt.plot_date(tstamps, timed, label="Timed", aa=True,
-                  linestyle='solid')
+    plt.title("Checkpoint rate")
+    plt.plot_date(tstamps, [c[0] for c in checkprates], label="requested",
+                  aa=True, linestyle='solid')
+    plt.plot_date(tstamps, [c[1] for c in checkprates], label="timed",
+                  aa=True, linestyle='solid')
     plt.xlabel("Timestamp", fontweight='semibold')
-    plt.ylabel("Checkpoints (since stats reset)", fontweight='semibold')
-
-    fig.axes[0].set_ylim(bottom=0)
-    fig.gca().yaxis.set_major_locator(MaxNLocator(integer=True))
+    plt.ylabel("Avg. checkpoints per minute", fontweight='semibold')
     fig.legend()
     fig.tight_layout()
     outfile = f"""{outputdir.rstrip("/") + "/" if outputdir
         else ''}pg_statviz_{info['hostname']
-        .replace("/", "-")}_{port}_checkp.png"""
+        .replace("/", "-")}_{port}_checkp_rate.png"""
     _logger.info(f"Saving {outfile}")
     plt.savefig(outfile)
