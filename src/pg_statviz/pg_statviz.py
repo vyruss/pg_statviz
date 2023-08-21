@@ -12,6 +12,7 @@ import sys
 from argh import ArghParser
 from pg_statviz.modules.analyze import analyze
 from pg_statviz.modules.buf import buf
+from pg_statviz.modules.buf_rate import buf_rate
 from pg_statviz.modules.cache import cache
 from pg_statviz.modules.checkp import checkp
 from pg_statviz.modules.conn import conn
@@ -33,7 +34,7 @@ def main():
     p.add_argument('--version', action='version',
                    version=f"pg_statviz {__version__}")
 
-    p.add_commands([analyze, buf, cache, checkp, conn, lock, tuple, wait,
+    p.add_commands([analyze, buf, buf_rate, cache, checkp, conn, lock, tuple, wait,
                     wal])
     p.set_default_command(analyze)
     p.dispatch()

@@ -9,6 +9,7 @@ __license__ = "PostgreSQL License"
 import getpass
 from argh.decorators import arg
 from pg_statviz.modules.buf import buf
+from pg_statviz.modules.buf_rate import buf_rate
 from pg_statviz.modules.cache import cache
 from pg_statviz.modules.checkp import checkp
 from pg_statviz.modules.conn import conn
@@ -42,6 +43,7 @@ def analyze(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     connx = dbconn(**conn_details)
     info = getinfo(connx)
     buf(daterange=daterange, outputdir=outputdir, info=info, conn=connx)
+    buf_rate(daterange=daterange, outputdir=outputdir, info=info, conn=connx)
     checkp(daterange=daterange, outputdir=outputdir, info=info, conn=connx)
     cache(daterange=daterange, outputdir=outputdir, info=info, conn=connx)
     conn(daterange=daterange, outputdir=outputdir, info=info, conn=connx)
