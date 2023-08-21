@@ -21,7 +21,7 @@ from pg_statviz.modules.lock import lock
 from pg_statviz.modules.tuple import tuple
 from pg_statviz.modules.wait import wait
 from pg_statviz.modules.wal import wal
-
+from pg_statviz.modules.wal_rate import wal_rate
 
 # Python version check
 if sys.version_info < (3, 9):
@@ -36,7 +36,7 @@ def main():
                    version=f"pg_statviz {__version__}")
 
     p.add_commands([analyze, buf, buf_rate, cache, checkp,checkp_rate, conn, lock, tuple, wait,
-                    wal])
+                    wal,wal_rate])
     p.set_default_command(analyze)
     p.dispatch()
 

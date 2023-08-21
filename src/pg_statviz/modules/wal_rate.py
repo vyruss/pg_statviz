@@ -31,10 +31,10 @@ from pg_statviz.libs.info import getinfo
 @arg('-O', '--outputdir', help="output directory")
 @arg('--info', help=argparse.SUPPRESS)
 @arg('--conn', help=argparse.SUPPRESS)
-def wal(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
+def wal_rate(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
         username=getpass.getuser(), password=False, daterange=[],
         outputdir=None, info=None, conn=None):
-    "run WAL generation analysis module"
+    "run WAL generation rate analysis module"
 
     MAX_RESULTS = 1000
 
@@ -50,7 +50,7 @@ def wal(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     if not info:
         info = getinfo(conn)
 
-    _logger.info("Running WAL generation analysis")
+    _logger.info("Running WAL generation rate analysis")
 
     if daterange:
         daterange = [isoparse(d) for d in daterange]
@@ -71,25 +71,34 @@ def wal(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
         raise SystemExit("No pg_statviz snapshots found in this database")
 
     tstamps = [t['snapshot_tstamp'] for t in data]
-    walgb = [round(w['wal_bytes'] / 1073741824, 1) for w in data]
+    
+    # WAL diff generator - yields list of the rates in MB/s
+    def waldiff(data):
+        yield numpy.nan
+        for i, item in enumerate(data):
+            if i + 1 < len(data):
+                if data[i + 1]['stats_reset'] == data[i]['stats_reset']:
+                    s = (data[i + 1]['snapshot_tstamp']
+                         - data[i]['snapshot_tstamp']).total_seconds()
+                    yield (int(data[i + 1]['wal_bytes'])
+                           - int(data[i]['wal_bytes'])) / 1048576 / s
+                else:
+                    yield numpy.nan
+    walrates = list(waldiff(data))
 
-    # Plot WAL in GB
+    # Plot WAL rates
     plt, fig = plot.setup()
     plt.suptitle(f"pg_statviz · {info['hostname']}:{port}",
                  fontweight='semibold')
-    plt.title("WAL generated")
-    plt.plot_date(tstamps, walgb, label="WAL", aa=True,
+    plt.title("WAL generation rate")
+    plt.plot_date(tstamps, walrates, label="WAL", aa=True,
                   linestyle='solid')
     plt.xlabel("Timestamp", fontweight='semibold')
-    plt.ylabel("GB generated (since stats reset)", fontweight='semibold')
-    fig.axes[0].set_ylim(bottom=0)
-    fig.gca().yaxis.set_major_locator(MaxNLocator(integer=True))
+    plt.ylabel("Avg. WAL generation rate (MB/s)", fontweight='semibold')
     fig.legend()
     fig.tight_layout()
     outfile = f"""{outputdir.rstrip("/") + "/" if outputdir
         else ''}pg_statviz_{info['hostname']
-        .replace("/", "-")}_{port}_wal.png"""
+        .replace("/", "-")}_{port}_wal_rate.png"""
     _logger.info(f"Saving {outfile}")
     plt.savefig(outfile)
-
-
