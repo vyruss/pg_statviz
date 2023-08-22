@@ -75,16 +75,7 @@ def buf(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     blcksz = int(info['block_size'])
 
     # Gather buffers and convert to GB
-    total = [round((b['buffers_checkpoint']
-                    + b['buffers_clean']
-                    + b['buffers_backend'])
-                   * blcksz / 1073741824, 1) for b in data]
-    checkpoints = [round(b['buffers_checkpoint']
-                         * blcksz / 1073741824, 1) for b in data]
-    bgwriter = [round(b['buffers_clean']
-                      * blcksz / 1073741824, 1) for b in data]
-    backends = [round(b['buffers_backend']
-                      * blcksz / 1073741824, 1) for b in data]
+    total, checkpoints, bgwriter, backends = calc_buffers(data,blcksz)
 
     # Plot buffers
     plt, fig = plot.setup()
@@ -111,34 +102,9 @@ def buf(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     _logger.info(f"Saving {outfile}")
     plt.savefig(outfile)
 
-    # Buffer diff generator - yields 3-tuple list of the 3 rates in buffers/s
-    def bufdiff(data):
-        yield (numpy.nan, numpy.nan, numpy.nan)
-        for i, item in enumerate(data):
-            if i + 1 < len(data):
-                if data[i + 1]['stats_reset'] == data[i]['stats_reset']:
-                    s = (data[i + 1]['snapshot_tstamp']
-                         - data[i]['snapshot_tstamp']).total_seconds()
-                    yield ((data[i + 1]['buffers_checkpoint']
-                           - data[i]['buffers_checkpoint']) / s,
-                           (data[i + 1]['buffers_clean']
-                           - data[i]['buffers_clean']) / s,
-                           (data[i + 1]['buffers_backend']
-                           - data[i]['buffers_backend']) / s)
-                else:
-                    yield (numpy.nan, numpy.nan, numpy.nan)
-    buffers = list(bufdiff(data))
-
-    # Normalize and round the rate data
-    total = [round((b[0] + b[1] + b[2]) * blcksz / 1048576,
-                   1 if b[0] >= 100 else 2)
-             for b in buffers]
-    checkpoints = [round(b[0] * blcksz / 1048576, 1 if b[0] >= 100 else 2)
-                   for b in buffers]
-    bgwriter = [round(b[1] * blcksz / 1048576, 1 if b[0] >= 100 else 2)
-                for b in buffers]
-    backends = [round(b[2] * blcksz / 1048576, 1 if b[0] >= 100 else 2)
-                for b in buffers]
+    
+    # Gather buffer rates and convert to MB/s
+    total, checkpoints, bgwriter, backends = calc_buff_rate(data,blcksz)
 
     # Plot buffer rates
     plt, fig = plot.setup()
@@ -163,3 +129,50 @@ def buf(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
         .replace("/", "-")}_{port}_buf_rate.png"""
     _logger.info(f"Saving {outfile}")
     plt.savefig(outfile)
+
+
+def calc_buffers(data,blcksz=8192):
+    total = [round((b['buffers_checkpoint']
+                    + b['buffers_clean']
+                    + b['buffers_backend'])
+                   * blcksz / 1073741824, 1) for b in data]
+    checkpoints = [round(b['buffers_checkpoint']
+                         * blcksz / 1073741824, 1) for b in data]
+    bgwriter = [round(b['buffers_clean']
+                      * blcksz / 1073741824, 1) for b in data]
+    backends = [round(b['buffers_backend']
+                      * blcksz / 1073741824, 1) for b in data]
+    
+    return total,checkpoints,bgwriter,backends
+
+
+def calc_buff_rate(data,blcksz=8192):
+    # Buffer diff generator - yields 3-tuple list of the 3 rates in buffers/s
+    def bufdiff(data):
+        yield (numpy.nan, numpy.nan, numpy.nan)
+        for i, item in enumerate(data):
+            if i + 1 < len(data):
+                if data[i + 1]['stats_reset'] == data[i]['stats_reset']:
+                    s = (data[i + 1]['snapshot_tstamp']
+                         - data[i]['snapshot_tstamp']).total_seconds()
+                    yield ((data[i + 1]['buffers_checkpoint']
+                           - data[i]['buffers_checkpoint']) / s,
+                           (data[i + 1]['buffers_clean']
+                           - data[i]['buffers_clean']) / s,
+                           (data[i + 1]['buffers_backend']
+                           - data[i]['buffers_backend']) / s)
+                else:
+                    yield (numpy.nan, numpy.nan, numpy.nan)
+                    
+    buffers = list(bufdiff(data))
+    total = [round((b[0] + b[1] + b[2]) * blcksz / 1048576,
+                   1 if b[0] >= 100 else 2)
+             for b in buffers]
+    checkpoints = [round(b[0] * blcksz / 1048576, 1 if b[0] >= 100 else 2)
+                   for b in buffers]
+    bgwriter = [round(b[1] * blcksz / 1048576, 1 if b[0] >= 100 else 2)
+                for b in buffers]
+    backends = [round(b[2] * blcksz / 1048576, 1 if b[0] >= 100 else 2)
+                for b in buffers]
+    
+    return total,checkpoints,bgwriter,backends
