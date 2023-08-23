@@ -71,9 +71,7 @@ def checkp(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     if not data:
         raise SystemExit("No pg_statviz snapshots found in this database")
 
-    tstamps = [t['snapshot_tstamp'] for t in data]
-    req = [c['checkpoints_req'] for c in data]
-    timed = [c['checkpoints_timed'] for c in data]
+    tstamps,req,timed = calc_checkpoints(data)
 
     # Plot checkpoints
     plt, fig = plot.setup()
@@ -100,20 +98,7 @@ def checkp(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
 
     # Checkpoint diff generator - yields tuple list of the rates in
     # checkpoints/minute
-    def checkpdiff(data):
-        yield (numpy.nan, numpy.nan)
-        for i, item in enumerate(data):
-            if i + 1 < len(data):
-                if data[i + 1]['stats_reset'] == data[i]['stats_reset']:
-                    m = (data[i + 1]['snapshot_tstamp']
-                         - data[i]['snapshot_tstamp']).total_seconds() / 60
-                    yield (round((data[i + 1]['checkpoints_req']
-                                  - data[i]['checkpoints_req']) / m, 1),
-                           round((data[i + 1]['checkpoints_timed']
-                                  - data[i]['checkpoints_timed']) / m, 1))
-                else:
-                    yield (numpy.nan, numpy.nan)
-    checkprates = list(checkpdiff(data))
+    checkprates = calc_checkpoint_rate(data)
 
     # Plot WAL rates
     plt, fig = plot.setup()
@@ -133,3 +118,28 @@ def checkp(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
         .replace("/", "-")}_{port}_checkp_rate.png"""
     _logger.info(f"Saving {outfile}")
     plt.savefig(outfile)
+
+
+def calc_checkpoints(data):
+    tstamps = [t['snapshot_tstamp'] for t in data]
+    req = [c['checkpoints_req'] for c in data]
+    timed = [c['checkpoints_timed'] for c in data]
+    
+    
+    return tstamps,req,timed
+
+def calc_checkpoint_rate(data):
+    def checkpdiff(data):
+        yield (numpy.nan, numpy.nan)
+        for i, item in enumerate(data):
+            if i + 1 < len(data):
+                if data[i + 1]['stats_reset'] == data[i]['stats_reset']:
+                    m = (data[i + 1]['snapshot_tstamp']
+                         - data[i]['snapshot_tstamp']).total_seconds() / 60
+                    yield (round((data[i + 1]['checkpoints_req']
+                                  - data[i]['checkpoints_req']) / m, 1),
+                           round((data[i + 1]['checkpoints_timed']
+                                  - data[i]['checkpoints_timed']) / m, 1))
+                else:
+                    yield (numpy.nan, numpy.nan)
+    return list(checkpdiff(data))
