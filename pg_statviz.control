@@ -1,5 +1,5 @@
 # pg_statviz
 comment = 'stats visualization and time series analysis'
-default_version = '0.4'
+default_version = '0.5'
 schema = pgstatviz
 relocatable = false
