@@ -67,10 +67,7 @@ def cache(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     if not data:
         raise SystemExit("No pg_statviz snapshots found in this database")
 
-    tstamps = [t['snapshot_tstamp'] for t in data]
-    ratio = [round((int(d['blks_hit'])
-                   / (int(d['blks_read']) + int(d['blks_hit']))) * 100, 2)
-             for d in data]
+    tstamps, ratio = calc_cache_hit_ratio(data)
 
     # Plot cache hit ratio
     plt, fig = plot.setup()
@@ -91,3 +88,11 @@ def cache(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
         .replace("/", "-")}_{port}_cache.png"""
     _logger.info(f"Saving {outfile}")
     plt.savefig(outfile)
+
+def calc_cache_hit_ratio(data):
+    tstamps = [t['snapshot_tstamp'] for t in data]
+    ratio = [round(int(d['blks_hit'])
+                   / int(d['blks_read']) + int(d['blks_hit']) * 100, 2)
+             for d in data]
+    
+    return tstamps, ratio
