@@ -92,19 +92,7 @@ def wal(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     _logger.info(f"Saving {outfile}")
     plt.savefig(outfile)
 
-    # WAL diff generator - yields list of the rates in MB/s
-    def waldiff(data):
-        yield numpy.nan
-        for i, item in enumerate(data):
-            if i + 1 < len(data):
-                if data[i + 1]['stats_reset'] == data[i]['stats_reset']:
-                    s = (data[i + 1]['snapshot_tstamp']
-                         - data[i]['snapshot_tstamp']).total_seconds()
-                    yield (int(data[i + 1]['wal_bytes'])
-                           - int(data[i]['wal_bytes'])) / 1048576 / s
-                else:
-                    yield numpy.nan
-    walrates = list(waldiff(data))
+    walrates = calc_wal_generation_rate(data)
 
     # Plot WAL rates
     plt, fig = plot.setup()
@@ -122,3 +110,18 @@ def wal(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
         .replace("/", "-")}_{port}_wal_rate.png"""
     _logger.info(f"Saving {outfile}")
     plt.savefig(outfile)
+
+def calc_wal_generation_rate(data):
+     # WAL diff generator - yields list of the rates in MB/s
+    def waldiff(data):
+        yield numpy.nan
+        for i, item in enumerate(data):
+            if i + 1 < len(data):
+                if data[i + 1]['stats_reset'] == data[i]['stats_reset']:
+                    s = (data[i + 1]['snapshot_tstamp']
+                         - data[i]['snapshot_tstamp']).total_seconds()
+                    yield (int(data[i + 1]['wal_bytes'])
+                           - int(data[i]['wal_bytes'])) / 1048576 / s
+                else:
+                    yield numpy.nan
+    return list(waldiff(data))
