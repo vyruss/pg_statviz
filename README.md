@@ -23,9 +23,7 @@ retrieving the stored snapshots and creating with them simple visualizations usi
 
 The extension can be installed like this, for example inside `psql`:
 
-```sql
-CREATE EXTENSION pg_statviz;
-```
+    CREATE EXTENSION pg_statviz;
 
 This will create the needed tables and functions under schema `pgstatviz` (note the lack of 
 underscore in the schema name).
@@ -34,9 +32,7 @@ underscore in the schema name).
 
 The visualization utility can be installed from [PyPi](https://pypi.org/project/pg_statviz/):
 
-```shell
-pip install pg_statviz
-```
+    pip install pg_statviz
 
 ### Requirements
 
@@ -47,11 +43,9 @@ Python 3.9+ is required for the visualization utility.
 The extension can be used by superusers, or any user that has `pg_monitor` role privileges. To take 
 a snapshot, e.g. from `psql`:
 
-```sql
-SELECT pgstatviz.snapshot();
-```
+    SELECT pgstatviz.snapshot();
 
-```sql
+```
 NOTICE:  created pg_statviz snapshot
            snapshot
 -------------------------------
@@ -59,23 +53,19 @@ NOTICE:  created pg_statviz snapshot
  2023-01-27 11:04:58.055453+00
 
 (1 row)
-```
+````
 
 Older snapshots and their associated data can be removed using any time expression. For example, to 
 remove data more than 90 days old:
 
-```sql
-DELETE FROM pgstatviz.snapshots
-WHERE snapshot_tstamp < CURRENT_DATE - 90;
-```
+    DELETE FROM pgstatviz.snapshots
+    WHERE snapshot_tstamp < CURRENT_DATE - 90;
 
 Or all snapshots can be removed like this:
 
-```sql
-SELECT pgstatviz.delete_snapshots();
-```
+    SELECT pgstatviz.delete_snapshots();
 
-```sql
+```
 NOTICE:  truncating table "snapshots"
 NOTICE:  truncate cascades to table "conf"
 NOTICE:  truncate cascades to table "buf"
@@ -92,31 +82,23 @@ NOTICE:  truncate cascades to table "db"
 
 The `pg_monitor` role can be assigned to any user:
 
-```sql
-GRANT pg_monitor TO myuser;
-```
+    GRANT pg_monitor TO myuser;
 
 ## Scheduling
 
 Periodic snapshots can be set up with any job scheduler. For example with `cron`:
 
-```shell
-crontab -e -u postgres
-```
+    crontab -e -u postgres
 
 Inside the `postgres` user's crontab, add this line to take a snapshot every 15 minutes:
 
-```
-*/15 * * * * psql -c "SELECT pgstatviz.snapshot()" >/dev/null 2>&1
-```
+    */15 * * * * psql -c "SELECT pgstatviz.snapshot()" >/dev/null 2>&1
 
 ## Visualization
 
 The visualization utility can be called like a PostgreSQL command line tool:
 
-```shell
-pg_statviz --help
-```
+    pg_statviz --help
 
 ```
 usage: pg_statviz [--help] [--version] [-d DBNAME] [-h HOSTNAME] [-p PORT] [-U USERNAME] [-W]
@@ -157,9 +139,7 @@ options:
 
 ### Specific module usage
 
-```shell
-pg_statviz conn --help
-```
+    pg_statviz conn --help
 
 ```
 usage: pg_statviz conn [-h] [-d DBNAME] [--host HOSTNAME] [-p PORT] [-U USERNAME] [-W]
@@ -187,9 +167,8 @@ options:
 
 ### Example:
 
-```shell
-pg_statviz buf --host localhost -d postgres -U postgres -D 2023-01-24T23:00 2023-01-26
-```
+    pg_statviz buf --host localhost -d postgres -U postgres -D 2023-01-24T23:00 2023-01-26
+
 
 ### Produces:
 ![buf output sample](src/pg_statviz/libs/pg_statviz_localhost_5432_buf.png)
@@ -201,6 +180,6 @@ pg_statviz buf --host localhost -d postgres -U postgres -D 2023-01-24T23:00 2023
 Data from `pg_statviz` internal tables can be exported to a tab separated values (TSV) file for use 
 by other tools:
 
-```shell
-psql -c "COPY pgstatviz.conn TO STDOUT CSV HEADER DELIMITER E'\t'" > conn.tsv
-```
+
+    psql -c "COPY pgstatviz.conn TO STDOUT CSV HEADER DELIMITER E'\t'" > conn.tsv
+    
