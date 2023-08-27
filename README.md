@@ -40,7 +40,13 @@ sudo yum install pg_statviz_extension-<pg_version>
 ```
 
 Extension would have installed now and needs to be enabled in PostgreSQL.
-### Generic Installation
+
+### PGXN (PostgreSQL Extension Network)
+
+The extension is available for download from the offical PGXN website. To access the extension visit: [PGXN pg_statviz](https://pgxn.org/dist/pg_statviz/).
+
+To install from PGXN, either download the zip and install manually or use the [PGXN CLI](https://pgxn.github.io/pgxnclient/) to install
+### Manual Installation
 
 Clone the repository locally.
 ```
