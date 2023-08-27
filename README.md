@@ -21,7 +21,40 @@ retrieving the stored snapshots and creating with them simple visualizations usi
 
 ### Extension
 
-The extension can be installed like this, for example inside `psql`:
+### Red Hat Enterprise Linux(version>8.0)/Fedora(version: 37 & 38)
+
+1. Install the PGDG repository selecting the appropriate version from [here](https://www.postgresql.org/download/linux/redhat).
+2. Install the respective postgresql version if not present already
+3. Use `dnf` or `yum` to search and install the pg_statviz package.
+```
+sudo dnf search pg_statviz
+OR
+sudo yum search pg_statviz
+```
+
+4. Install the respective version of extension 
+```
+sudo dnf install pg_statviz_extension-<pg_version>
+OR
+sudo yum install pg_statviz_extension-<pg_version>
+```
+
+Extension would have installed now and needs to be enabled in PostgreSQL.
+### Generic Installation
+
+Clone the repository locally.
+```
+git clone https://github.com/vyruss/pg_statviz.git 
+```
+Install the extension to it's default desired location i.e `SHAREDIR/extension`.
+```
+sudo make install
+```
+
+Extension should have been installed in the extensions directory now.
+
+### Enabling Extension
+The extension can be enabled in PostgreSQL like this, for example inside `psql`:
 
     CREATE EXTENSION pg_statviz;
 
@@ -33,6 +66,12 @@ underscore in the schema name).
 The visualization utility can be installed from [PyPi](https://pypi.org/project/pg_statviz/):
 
     pip install pg_statviz
+
+The extension is also available in the pgdg [yum repository](https://www.postgresql.org/download/linux/redhat/) and can be installed using `dnf`/`yum` after including the required repository from the same website.
+```
+sudo dnf install pg_statviz
+sudo yum install pg_statviz
+```
 
 ### Requirements
 
