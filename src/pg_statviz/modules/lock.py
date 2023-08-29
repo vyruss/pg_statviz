@@ -76,10 +76,11 @@ def lock(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     # Determine all lock modes for plotting
     lockmodes = []
     for lo in locks:
-        if 'lock_mode' in lo:
-            lm = lo['lock_mode']
-            if lm not in lockmodes:
-                lockmodes += lm,
+        for l in lo:
+            if 'lock_mode' in l:
+                lm = l['lock_mode']
+                if lm not in lockmodes:
+                    lockmodes += lm,
 
     # Plot as many of each lock mode we have per snapshot
     plt, fig = plot.setup()
