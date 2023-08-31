@@ -17,67 +17,61 @@ of PostgreSQL statistics for visualization and analysis. To this end, a utility 
 retrieving the stored snapshots and creating with them simple visualizations using
 [Matplotlib](https://github.com/matplotlib/matplotlib).
 
-## Installation
+## Installing the extension
 
-### Extension
+### Red Hat Enterprise Linux (v8.0+) / Fedora (37+)
 
-### Red Hat Enterprise Linux(version>8.0)/Fedora(version: 37 & 38)
+1. Configure the PostgreSQL Yum repository for your Linux distribution, as
+[explained here](https://www.postgresql.org/download/linux/redhat).
+2. Use `dnf` or `yum` to install the extension for your PostgreSQL version:
 
-1. Install the PGDG repository selecting the appropriate version from [here](https://www.postgresql.org/download/linux/redhat).
-2. Install the respective postgresql version if not present already
-3. Use `dnf` or `yum` to search and install the pg_statviz package.
-```
-sudo dnf search pg_statviz
-OR
-sudo yum search pg_statviz
-```
-
-4. Install the respective version of extension 
-```
-sudo dnf install pg_statviz_extension-<pg_version>
-OR
-sudo yum install pg_statviz_extension-<pg_version>
-```
-
-Extension would have installed now and needs to be enabled in PostgreSQL.
+        sudo dnf install pg_statviz_extension-<pg_version>
+        OR
+        sudo yum install pg_statviz_extension-<pg_version>
 
 ### PGXN (PostgreSQL Extension Network)
 
-The extension is available for download from the offical PGXN website. To access the extension visit: [PGXN pg_statviz](https://pgxn.org/dist/pg_statviz/).
+The extension is available on [PGXN](https://pgxn.org/dist/pg_statviz/).
 
-To install from PGXN, either download the zip and install manually or use the [PGXN CLI](https://pgxn.github.io/pgxnclient/) to install
-### Manual Installation
+To install from PGXN, either download the zip file and install manually or use the
+[PGXN Client](https://pgxn.github.io/pgxnclient/) to install:
 
-Clone the repository locally.
-```
-git clone https://github.com/vyruss/pg_statviz.git 
-```
-Install the extension to it's default desired location i.e `SHAREDIR/extension`.
-```
-sudo make install
-```
+    pgxn install pg_statviz
 
-Extension should have been installed in the extensions directory now.
+### Manual installation
 
-### Enabling Extension
-The extension can be enabled in PostgreSQL like this, for example inside `psql`:
+To install manually, clone this repository locally:
 
+    git clone https://github.com/vyruss/pg_statviz.git 
+
+This will install the extension in the appropriate location for your system (`$SHAREDIR/extension`):
+
+    cd pg_statviz
+    sudo make install
+
+### Enabling the extension
+
+The extension can now be enabled inside the appropriate database like this, e.g. from `psql`:
+
+    \c mydatabase
     CREATE EXTENSION pg_statviz;
 
 This will create the needed tables and functions under schema `pgstatviz` (note the lack of 
 underscore in the schema name).
 
-### Utility
+## Installing the utility
 
-The visualization utility can be installed from [PyPi](https://pypi.org/project/pg_statviz/):
+The visualization utility can also be installed from [PyPi](https://pypi.org/project/pg_statviz/):
 
     pip install pg_statviz
 
-The extension is also available in the pgdg [yum repository](https://www.postgresql.org/download/linux/redhat/) and can be installed using `dnf`/`yum` after including the required repository from the same website.
-```
-sudo dnf install pg_statviz
-sudo yum install pg_statviz
-```
+The utility is also available in the 
+[PostgreSQL Yum Repository](https://www.postgresql.org/download/linux/redhat/) and can be installed
+using `dnf` or `yum`:
+
+    sudo dnf install pg_statviz
+    OR 
+    sudo yum install pg_statviz
 
 ### Requirements
 
@@ -85,7 +79,7 @@ Python 3.9+ is required for the visualization utility.
 
 ## Usage
 
-The extension can be used by superusers, or any user that has `pg_monitor` role privileges. To take 
+The extension can be used by superusers, or any user that has `pg_monitor` role privileges. To take
 a snapshot, e.g. from `psql`:
 
     SELECT pgstatviz.snapshot();
@@ -145,86 +139,87 @@ The visualization utility can be called like a PostgreSQL command line tool:
 
     pg_statviz --help
 
-```
-usage: pg_statviz [--help] [--version] [-d DBNAME] [-h HOSTNAME] [-p PORT] [-U USERNAME] [-W]
-                  [-D FROM TO] [-O OUTPUTDIR]
-                  {analyze,buf,cache,checkp,conn,lock,tuple,wait,wal} ...
+[comment]::
 
-run all analysis modules
-
-positional arguments:
-  {analyze,buf,cache,checkp,conn,tuple,wait,wal}
-    analyze             run all analysis modules
-    buf                 run buffers written analysis module
-    cache               run cache hit ratio analysis module
-    checkp              run checkpoint analysis module
-    conn                run connection count analysis module
-    lock                run locks analysis module
-    tuple               run tuple count analysis module
-    wait                run wait events analysis module
-    wal                 run WAL generation analysis module
-
-options:
-  --help
-  --version             show program's version number and exit
-  -d DBNAME, --dbname DBNAME
-                        database name to analyze (default: 'myuser')
-  -h HOSTNAME, --host HOSTNAME
-                        database server host or socket directory (default: '/var/run/postgresql')
-  -p PORT, --port PORT  database server port (default: '5432')
-  -U USERNAME, --username USERNAME
-                        database user name (default: 'myuser')
-  -W, --password        force password prompt (should happen automatically) (default: False)
-  -D FROM TO, --daterange FROM TO
-                        date range to be analyzed in ISO 8601 format e.g. 2023-01-01T00:00
-                        2023-01-01T23:59 (default: [])
-  -O OUTPUTDIR, --outputdir OUTPUTDIR
-                        output directory (default: -)
-```
+    usage: pg_statviz [--help] [--version] [-d DBNAME] [-h HOSTNAME] [-p PORT] [-U USERNAME] [-W]
+                      [-D FROM TO] [-O OUTPUTDIR]
+                      {analyze,buf,cache,checkp,conn,lock,tuple,wait,wal} ...
+    
+    run all analysis modules
+    
+    positional arguments:
+      {analyze,buf,cache,checkp,conn,tuple,wait,wal}
+        analyze             run all analysis modules
+        buf                 run buffers written analysis module
+        cache               run cache hit ratio analysis module
+        checkp              run checkpoint analysis module
+        conn                run connection count analysis module
+        lock                run locks analysis module
+        tuple               run tuple count analysis module
+        wait                run wait events analysis module
+        wal                 run WAL generation analysis module
+    
+    options:
+      --help
+      --version             show program's version number and exit
+      -d DBNAME, --dbname DBNAME
+                            database name to analyze (default: 'myuser')
+      -h HOSTNAME, --host HOSTNAME
+                            database server host or socket directory (default: '/var/run/postgresql')
+      -p PORT, --port PORT  database server port (default: '5432')
+      -U USERNAME, --username USERNAME
+                            database user name (default: 'myuser')
+      -W, --password        force password prompt (should happen automatically) (default: False)
+      -D FROM TO, --daterange FROM TO
+                            date range to be analyzed in ISO 8601 format e.g. 2023-01-01T00:00
+                            2023-01-01T23:59 (default: [])
+      -O OUTPUTDIR, --outputdir OUTPUTDIR
+                            output directory (default: -)
 
 ### Specific module usage
 
     pg_statviz conn --help
 
-```
-usage: pg_statviz conn [-h] [-d DBNAME] [--host HOSTNAME] [-p PORT] [-U USERNAME] [-W]
-                       [-D FROM TO] [-O OUTPUTDIR] [-u [USERS ...]]
+[comment]::
 
-run connection count analysis module
-
-options:
-  -h, --help            show this help message and exit
-  -d DBNAME, --dbname DBNAME
-                        database name to analyze (default: 'myuser')
-  --host HOSTNAME       database server host or socket directory (default: '/var/run/postgresql')
-  -p PORT, --port PORT  database server port (default: '5432')
-  -U USERNAME, --username USERNAME
-                        database user name (default: 'myuser')
-  -W, --password        force password prompt (should happen automatically) (default: False)
-  -D FROM TO, --daterange FROM TO
-                        date range to be analyzed in ISO 8601 format e.g. 2023-01-01T00:00
-                        2023-01-01T23:59 (default: [])
-  -O OUTPUTDIR, --outputdir OUTPUTDIR
-                        output directory (default: -)
-  -u [USERS ...], --users [USERS ...]
-                        user name(s) to plot in analysis (default: [])
-```
+    usage: pg_statviz conn [-h] [-d DBNAME] [--host HOSTNAME] [-p PORT] [-U USERNAME] [-W]
+                           [-D FROM TO] [-O OUTPUTDIR] [-u [USERS ...]]
+    
+    run connection count analysis module
+    
+    options:
+      -h, --help            show this help message and exit
+      -d DBNAME, --dbname DBNAME
+                            database name to analyze (default: 'myuser')
+      --host HOSTNAME       database server host or socket directory (default: '/var/run/postgresql')
+      -p PORT, --port PORT  database server port (default: '5432')
+      -U USERNAME, --username USERNAME
+                            database user name (default: 'myuser')
+      -W, --password        force password prompt (should happen automatically) (default: False)
+      -D FROM TO, --daterange FROM TO
+                            date range to be analyzed in ISO 8601 format e.g. 2023-01-01T00:00
+                            2023-01-01T23:59 (default: [])
+      -O OUTPUTDIR, --outputdir OUTPUTDIR
+                            output directory (default: -)
+      -u [USERS ...], --users [USERS ...]
+                            user name(s) to plot in analysis (default: [])
 
 ### Example:
 
     pg_statviz buf --host localhost -d postgres -U postgres -D 2023-01-24T23:00 2023-01-26
 
-
 ### Produces:
 ![buf output sample](src/pg_statviz/libs/pg_statviz_localhost_5432_buf.png)
+
+[comment]::
+
 ![buf output sample (rate)](src/pg_statviz/libs/pg_statviz_localhost_5432_buf_rate.png)
 
 
 ## Export data
 
-Data from `pg_statviz` internal tables can be exported to a tab separated values (TSV) file for use 
+Data from `pg_statviz` internal tables can be exported to a tab separated values (TSV) file for use
 by other tools:
 
 
     psql -c "COPY pgstatviz.conn TO STDOUT CSV HEADER DELIMITER E'\t'" > conn.tsv
-    
