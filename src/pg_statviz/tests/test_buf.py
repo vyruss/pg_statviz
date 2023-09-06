@@ -1,46 +1,70 @@
-from pg_statviz.modules.buf import calc_buffers, calc_buff_rate
-import psycopg2
-from datetime import datetime,timedelta
-import numpy 
-static_time=datetime.now()
-data= [
-				{'buffers_checkpoint': 500, 'buffers_clean': 800, 'buffers_backend': 1200,'stats_reset': static_time,'snapshot_tstamp': datetime.now()+timedelta(seconds=1)},
-				{'buffers_checkpoint': 300, 'buffers_clean': 600, 'buffers_backend': 900,'stats_reset': static_time,'snapshot_tstamp': datetime.now()+timedelta(seconds=2)},
-				{'buffers_checkpoint': 1000, 'buffers_clean': 1500, 'buffers_backend': 2000,'stats_reset': static_time,'snapshot_tstamp': datetime.now()+timedelta(seconds=3)},
-				{'buffers_checkpoint': 750, 'buffers_clean': 1100, 'buffers_backend': 1700,'stats_reset': static_time,'snapshot_tstamp': datetime.now()+timedelta(seconds=4)},
-				{'buffers_checkpoint': 200, 'buffers_clean': 400, 'buffers_backend': 600,'stats_reset': static_time,'snapshot_tstamp': datetime.now()+timedelta(seconds=5)}
-]
+import numpy
+from datetime import datetime, timedelta
+from pg_statviz.tests.util import mock_dictrow
+from pg_statviz.modules.buf import calc_buffers, calc_bufrates
 
-def test_buffer_calculations():
+first_stats_reset = datetime.now()
+second_stats_reset = datetime.now() + timedelta(seconds=30)
 
-  response=calc_buffers(data,1024*1024*1024)
-  
-  total = [2500.0, 1800.0, 4500.0, 3550.0, 1200.0]
-  checkpoints = [500.0, 300.0, 1000.0, 750.0, 200.0]
-  bgwriter = [800.0, 600.0, 1500.0, 1100.0, 400.0]
-  backends = [1200.0, 900.0, 2000.0, 1700.0, 600.0]
-  
-  assert total==response[0]
-  assert checkpoints==response[1]
-  assert bgwriter==response[2]
-  assert backends==response[3]
-  
-def test_buffer_rate_calculations():
-  response=calc_buff_rate(data,8192)
-  
-  total = [numpy.nan, -5.47, 21.1, -7.42, -18.36]
-  checkpoints=[numpy.nan, -1.56, 5.5, -1.95, -4.3]
-  bgwriter=[numpy.nan, -1.56, 7.0, -3.12, -5.47]
-  backends=[numpy.nan, -2.34, 8.6, -2.34, -8.59]
-  
-  numpy.testing.assert_equal(numpy.array(total),numpy.array(response[0]))
-  numpy.testing.assert_equal(numpy.array(checkpoints),numpy.array(response[1]))
-  numpy.testing.assert_equal(numpy.array(bgwriter),numpy.array(response[2]))
-  numpy.testing.assert_equal(numpy.array(backends),numpy.array(response[3]))
+data = [mock_dictrow({'buffers_checkpoint': 150000,
+                      'buffers_clean': 140000,
+                      'buffers_backend': 130000,
+                      'stats_reset': first_stats_reset,
+                      'snapshot_tstamp': first_stats_reset
+                      + timedelta(seconds=10)}),
+        mock_dictrow({'buffers_checkpoint': 160000,
+                      'buffers_clean': 150000,
+                      'buffers_backend': 140000,
+                      'stats_reset': first_stats_reset,
+                      'snapshot_tstamp': first_stats_reset
+                      + timedelta(seconds=20)}),
+        mock_dictrow({'buffers_checkpoint': 170000,
+                      'buffers_clean': 160000,
+                      'buffers_backend': 150000,
+                      'stats_reset': second_stats_reset,
+                      'snapshot_tstamp': second_stats_reset
+                      + timedelta(seconds=10)}),
+        mock_dictrow({'buffers_checkpoint': 180000,
+                      'buffers_clean': 170000,
+                      'buffers_backend': 160000,
+                      'stats_reset': second_stats_reset,
+                      'snapshot_tstamp': second_stats_reset
+                      + timedelta(seconds=20)}),
+        mock_dictrow({'buffers_checkpoint': 200000,
+                      'buffers_clean': 190000,
+                      'buffers_backend': 180000,
+                      'stats_reset': second_stats_reset,
+                      'snapshot_tstamp': second_stats_reset
+                      + timedelta(seconds=30)})]
 
-  
-  
-  
-  
-  
-  
+
+def test_calc_buffers():
+    response = calc_buffers(data)
+
+    total = [3.2, 3.4, 3.7, 3.9, 4.3]
+    checkpoints = [1.1, 1.2, 1.3, 1.4, 1.5]
+    bgwriter = [1.1, 1.1, 1.2, 1.3, 1.4]
+    backends = [1.0, 1.1, 1.1, 1.2, 1.4]
+
+    assert total == response['total']
+    assert checkpoints == response['checkpoints']
+    assert bgwriter == response['bgwriter']
+    assert backends == response['backends']
+
+
+def test_calc_bufrates():
+    response = calc_bufrates(data)
+
+    total = [numpy.nan, 23.4, numpy.nan, 23.4, 46.9]
+    checkpoints = [numpy.nan, 7.8, numpy.nan, 7.8, 15.6]
+    bgwriter = [numpy.nan, 7.8, numpy.nan, 7.8, 15.6]
+    backends = [numpy.nan, 7.8, numpy.nan, 7.8, 15.6]
+
+    numpy.testing.assert_equal(numpy.array(total),
+                               numpy.array(response['total']))
+    numpy.testing.assert_equal(numpy.array(checkpoints),
+                               numpy.array(response['checkpoints']))
+    numpy.testing.assert_equal(numpy.array(bgwriter),
+                               numpy.array(response['bgwriter']))
+    numpy.testing.assert_equal(numpy.array(backends),
+                               numpy.array(response['backends']))

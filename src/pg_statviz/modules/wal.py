@@ -68,10 +68,18 @@ def wal(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                 (daterange[0], daterange[1]))
     data = cur.fetchmany(MAX_RESULTS)
     if not data:
-        raise SystemExit("No pg_statviz snapshots found in this database")
+        cur.execute("""SELECT
+                    (current_setting('server_version_num')::int >= 150000)""")
+        versioncheck = cur.fetchone()[0]
+        if not versioncheck:
+            _logger.error("WAL generation analysis is only available from "
+                          + "PostgreSQL release 15 onwards")
+            return
+        else:
+            raise SystemExit("No pg_statviz snapshots found in this database")
 
     tstamps = [t['snapshot_tstamp'] for t in data]
-    walgb = [round(w['wal_bytes'] / 1073741824, 1) for w in data]
+    walgb = calc_wal(data)
 
     # Plot WAL in GB
     plt, fig = plot.setup()
@@ -92,7 +100,7 @@ def wal(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     _logger.info(f"Saving {outfile}")
     plt.savefig(outfile)
 
-    walrates = calc_wal_generation_rate(data)
+    walrates = calc_walrates(data)
 
     # Plot WAL rates
     plt, fig = plot.setup()
@@ -111,8 +119,16 @@ def wal(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     _logger.info(f"Saving {outfile}")
     plt.savefig(outfile)
 
-def calc_wal_generation_rate(data):
-     # WAL diff generator - yields list of the rates in MB/s
+
+# Gather WAL data & convert to GB
+def calc_wal(data):
+    return [round(w['wal_bytes'] / 1073741824, 1) for w in data]
+
+
+# Calculate WAL rates
+def calc_walrates(data):
+
+    # WAL diff generator - yields list of the rates in MB/s
     def waldiff(data):
         yield numpy.nan
         for i, item in enumerate(data):
@@ -124,4 +140,5 @@ def calc_wal_generation_rate(data):
                            - int(data[i]['wal_bytes'])) / 1048576 / s
                 else:
                     yield numpy.nan
-    return list(waldiff(data))
+    rates = list(waldiff(data))
+    return [round(w, 1 if w >= 100 else 2) for w in rates]
