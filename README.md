@@ -240,7 +240,7 @@ To dump the captured data, e.g. for analysis on a different machine, run:
     
 Load it like this on the target database (which should have `pg_statviz` installed) :
 
-    psql -f pg_statviz_data.dump -d <target_database>
+    psql -f pg_statviz_data.dump -d <dbname>
 
 Alternatively, `pg_statviz` internal tables can also be exported to a tab separated values (TSV) file 
 for use by other tools:
@@ -249,5 +249,5 @@ for use by other tools:
     
 These can be loaded into another database like this (provided the tables exist):
 
-    psql -c "COPY pgstatviz.conn FROM STDIN CSV HEADER DELIMITER E'\t'" -d <target_database> < conn.tsv
+    psql -c "COPY pgstatviz.conn FROM STDIN CSV HEADER DELIMITER E'\t'" -d <dbname> < conn.tsv
 
