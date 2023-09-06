@@ -139,7 +139,7 @@ def tuple(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     plt, fig, splt1, splt2 = plot.setupdouble()
     plt.suptitle(f"pg_statviz · {info['hostname']}:{port}",
                  fontweight='semibold')
-    splt1.set_title("Tuple read rates")
+    splt1.set_title("Tuple read rate")
     splt1.plot_date(tstamps, [r[0] for r in tuplerates], label="returned",
                     aa=True, linestyle='solid')
     splt1.plot_date(tstamps, [r[1] for r in tuplerates], label="fetched",
@@ -149,7 +149,7 @@ def tuple(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     splt1.legend()
 
     # Plot tuple write rates
-    splt2.set_title("Tuple write rates")
+    splt2.set_title("Tuple write rate")
     splt2.plot_date(tstamps, [r[2] for r in tuplerates], label="inserted",
                     aa=True, linestyle='solid')
     splt2.plot_date(tstamps, [r[3] for r in tuplerates], label="updated",

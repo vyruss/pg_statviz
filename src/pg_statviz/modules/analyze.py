@@ -16,6 +16,7 @@ from pg_statviz.modules.lock import lock
 from pg_statviz.modules.tuple import tuple
 from pg_statviz.modules.wait import wait
 from pg_statviz.modules.wal import wal
+from pg_statviz.modules.xact import xact
 from pg_statviz.libs.dbconn import dbconn
 from pg_statviz.libs.info import getinfo
 
@@ -49,3 +50,4 @@ def analyze(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     tuple(daterange=daterange, outputdir=outputdir, info=info, conn=connx)
     wait(daterange=daterange, outputdir=outputdir, info=info, conn=connx)
     wal(daterange=daterange, outputdir=outputdir, info=info, conn=connx)
+    xact(daterange=daterange, outputdir=outputdir, info=info, conn=connx)

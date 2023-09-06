@@ -6,7 +6,7 @@ pg_statviz - stats visualization and time series analysis
 __author__ = "Jimmy Angelakos"
 __copyright__ = "Copyright (c) 2023 Jimmy Angelakos"
 __license__ = "PostgreSQL License"
-__version__ = "0.5"
+__version__ = "0.6"
 
 import sys
 from argh import ArghParser
@@ -19,6 +19,7 @@ from pg_statviz.modules.lock import lock
 from pg_statviz.modules.tuple import tuple
 from pg_statviz.modules.wait import wait
 from pg_statviz.modules.wal import wal
+from pg_statviz.modules.xact import xact
 
 
 # Python version check
@@ -34,7 +35,7 @@ def main():
                    version=f"pg_statviz {__version__}")
 
     p.add_commands([analyze, buf, cache, checkp, conn, lock, tuple, wait,
-                    wal])
+                    wal, xact])
     p.set_default_command(analyze)
     p.dispatch()
 
