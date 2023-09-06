@@ -84,15 +84,15 @@ a snapshot, e.g. from `psql`:
 
     SELECT pgstatviz.snapshot();
 
-```
-NOTICE:  created pg_statviz snapshot
-           snapshot
--------------------------------
+[comment]::
 
- 2023-01-27 11:04:58.055453+00
+    NOTICE:  created pg_statviz snapshot
+               snapshot
+    -------------------------------
 
-(1 row)
-````
+     2023-01-27 11:04:58.055453+00
+
+    (1 row)
 
 Older snapshots and their associated data can be removed using any time expression. For example, to 
 remove data more than 90 days old:
@@ -104,20 +104,20 @@ Or all snapshots can be removed like this:
 
     SELECT pgstatviz.delete_snapshots();
 
-```
-NOTICE:  truncating table "snapshots"
-NOTICE:  truncate cascades to table "conf"
-NOTICE:  truncate cascades to table "buf"
-NOTICE:  truncate cascades to table "conn"     
-NOTICE:  truncate cascades to table "lock"
-NOTICE:  truncate cascades to table "wait"                
-NOTICE:  truncate cascades to table "wal"
-NOTICE:  truncate cascades to table "db"
- delete_snapshots 
-------------------
+[comment]::
 
-(1 row)
-```
+    NOTICE:  truncating table "snapshots"
+    NOTICE:  truncate cascades to table "conf"
+    NOTICE:  truncate cascades to table "buf"
+    NOTICE:  truncate cascades to table "conn"     
+    NOTICE:  truncate cascades to table "lock"
+    NOTICE:  truncate cascades to table "wait"                
+    NOTICE:  truncate cascades to table "wal"
+    NOTICE:  truncate cascades to table "db"
+     delete_snapshots 
+    ------------------
+
+    (1 row)
 
 The `pg_monitor` role can be assigned to any user:
 
@@ -143,12 +143,12 @@ The visualization utility can be called like a PostgreSQL command line tool:
 
     usage: pg_statviz [--help] [--version] [-d DBNAME] [-h HOSTNAME] [-p PORT] [-U USERNAME] [-W]
                       [-D FROM TO] [-O OUTPUTDIR]
-                      {analyze,buf,cache,checkp,conn,lock,tuple,wait,wal} ...
+                      {analyze,buf,cache,checkp,conn,lock,tuple,wait,wal,xact} ...
     
     run all analysis modules
     
     positional arguments:
-      {analyze,buf,cache,checkp,conn,tuple,wait,wal}
+      {analyze,buf,cache,checkp,conn,tuple,wait,wal,xact}
         analyze             run all analysis modules
         buf                 run buffers written analysis module
         cache               run cache hit ratio analysis module
@@ -158,7 +158,8 @@ The visualization utility can be called like a PostgreSQL command line tool:
         tuple               run tuple count analysis module
         wait                run wait events analysis module
         wal                 run WAL generation analysis module
-    
+        xact                run transaction count analysis module
+   
     options:
       --help
       --version             show program's version number and exit
@@ -216,10 +217,37 @@ The visualization utility can be called like a PostgreSQL command line tool:
 ![buf output sample (rate)](src/pg_statviz/libs/pg_statviz_localhost_5432_buf_rate.png)
 
 
+## Schema
+
+The `pg_statviz` extension stores its data in the following tables:
+
+Table | Description
+--- | ---
+`pgstatviz.snapshots` | Timestamped snapshots
+`pgstatviz.buf` | Buffer, checkpointer and background writer data
+`pgstatviz.conf` | PostgreSQL server configuration data
+`pgstatviz.conn` | Connection data
+`pgstatviz.db` | PostgreSQL server and database statistics
+`pgstatviz.lock` | Locks data
+`pgstatviz.wait` | Wait events data 
+`pgstatviz.wal` | WAL generation data
+
 ## Export data
 
-Data from `pg_statviz` internal tables can be exported to a tab separated values (TSV) file for use
-by other tools:
+To dump the captured data, e.g. for analysis on a different machine, run:
 
+    pg_dump -a -O -t pgstatviz.* > pg_statviz_data.dump
+    
+Load it like this on the target database (which should have `pg_statviz` installed) :
+
+    psql -f pg_statviz_data.dump -d <target_database>
+
+Alternatively, `pg_statviz` internal tables can also be exported to a tab separated values (TSV) file 
+for use by other tools:
 
     psql -c "COPY pgstatviz.conn TO STDOUT CSV HEADER DELIMITER E'\t'" > conn.tsv
+    
+These can be loaded into another database like this (provided the tables exist):
+
+    psql -c "COPY pgstatviz.conn FROM STDIN CSV HEADER DELIMITER E'\t'" -d <target_database> < conn.tsv
+
