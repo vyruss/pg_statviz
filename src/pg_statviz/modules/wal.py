@@ -69,7 +69,7 @@ def wal(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     data = cur.fetchmany(MAX_RESULTS)
     if not data:
         cur.execute("""SELECT
-                    (current_setting('server_version_num')::int >= 160000)""")
+                    (current_setting('server_version_num')::int >= 150000)""")
         versioncheck = cur.fetchone()[0]
         if not versioncheck:
             _logger.error("WAL generation analysis is only available from "
