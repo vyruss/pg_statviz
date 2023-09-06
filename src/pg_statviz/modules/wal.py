@@ -68,7 +68,15 @@ def wal(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                 (daterange[0], daterange[1]))
     data = cur.fetchmany(MAX_RESULTS)
     if not data:
-        raise SystemExit("No pg_statviz snapshots found in this database")
+        cur.execute("""SELECT
+                    (current_setting('server_version_num')::int >= 160000)""")
+        versioncheck = cur.fetchone()[0]
+        if not versioncheck:
+            _logger.error("WAL generation analysis is only available from "
+                          + "PostgreSQL release 15 onwards")
+            return
+        else:
+            raise SystemExit("No pg_statviz snapshots found in this database")
 
     tstamps = [t['snapshot_tstamp'] for t in data]
     walgb = [round(w['wal_bytes'] / 1073741824, 1) for w in data]
