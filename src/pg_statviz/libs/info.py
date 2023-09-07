@@ -29,8 +29,7 @@ def getinfo(conn):
         cur.execute("""CREATE TEMP TABLE _info(hostname text);
                        COPY _info FROM PROGRAM 'hostname';
                        SELECT hostname,
-                              inet_server_addr(),
-                              current_setting('block_size')
+                              inet_server_addr()
                        FROM _info""")
         info['hostname'], info['inet_server_addr'], info['block_size'] \
             = cur.fetchone()

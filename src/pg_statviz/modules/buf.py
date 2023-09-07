@@ -62,8 +62,9 @@ def buf(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     # Retrieve the snapshots from DB
     cur = conn.cursor()
     cur.execute("""SELECT buffers_checkpoint, buffers_clean, buffers_backend,
-                          stats_reset, snapshot_tstamp
-                   FROM pgstatviz.buf
+                          b.stats_reset, snapshot_tstamp, block_size
+                   FROM pgstatviz.buf b
+                   JOIN pgstatviz.db USING (snapshot_tstamp)
                    WHERE snapshot_tstamp BETWEEN %s AND %s
                    ORDER BY snapshot_tstamp""",
                 (daterange[0], daterange[1]))
@@ -72,7 +73,7 @@ def buf(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
         raise SystemExit("No pg_statviz snapshots found in this database")
 
     tstamps = [t['snapshot_tstamp'] for t in data]
-    blcksz = int(info['block_size'])
+    blcksz = int(data[0]['block_size'])
 
     buffers = calc_buffers(data, blcksz)
 
@@ -141,7 +142,6 @@ def calc_buffers(data, blcksz=8192):
                               * blcksz / 1073741824, 1) for b in data]
     bufs['backends'] = [round(b['buffers_backend']
                               * blcksz / 1073741824, 1) for b in data]
-    print(bufs)
     return bufs
 
 
