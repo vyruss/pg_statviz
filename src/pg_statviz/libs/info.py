@@ -38,7 +38,8 @@ def getinfo(conn):
     except (ExternalRoutineException, InsufficientPrivilege) as e:
         conn.rollback()
         cur = conn.cursor()
-        _logger.error(e)
+        _logger.warning("Context: getting hostname")
+        _logger.warning(e)
         cur.execute("""SELECT inet_server_addr(),
                               current_setting('block_size')""")
         info['inet_server_addr'], info['block_size'] = cur.fetchone()
