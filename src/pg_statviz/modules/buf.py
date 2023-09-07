@@ -74,30 +74,20 @@ def buf(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     tstamps = [t['snapshot_tstamp'] for t in data]
     blcksz = int(info['block_size'])
 
-    # Gather buffers and convert to GB
-    total = [round((b['buffers_checkpoint']
-                    + b['buffers_clean']
-                    + b['buffers_backend'])
-                   * blcksz / 1073741824, 1) for b in data]
-    checkpoints = [round(b['buffers_checkpoint']
-                         * blcksz / 1073741824, 1) for b in data]
-    bgwriter = [round(b['buffers_clean']
-                      * blcksz / 1073741824, 1) for b in data]
-    backends = [round(b['buffers_backend']
-                      * blcksz / 1073741824, 1) for b in data]
+    buffers = calc_buffers(data, blcksz)
 
     # Plot buffers
     plt, fig = plot.setup()
     plt.suptitle(f"pg_statviz · {info['hostname']}:{port}",
                  fontweight='semibold')
     plt.title("Buffers written")
-    plt.plot_date(tstamps, total, label="total", aa=True,
+    plt.plot_date(tstamps, buffers['total'], label="total", aa=True,
                   linestyle='solid')
-    plt.plot_date(tstamps, checkpoints, label="checkpoints", aa=True,
+    plt.plot_date(tstamps, buffers['checkpoints'], label="checkpoints",
+                  aa=True, linestyle='solid')
+    plt.plot_date(tstamps, buffers['bgwriter'], label="bgwriter", aa=True,
                   linestyle='solid')
-    plt.plot_date(tstamps, bgwriter, label="bgwriter", aa=True,
-                  linestyle='solid')
-    plt.plot_date(tstamps, backends, label="backends", aa=True,
+    plt.plot_date(tstamps, buffers['backends'], label="backends", aa=True,
                   linestyle='solid')
     plt.xlabel("Timestamp", fontweight='semibold')
     plt.ylabel("GB written (since stats reset)", fontweight='semibold')
@@ -111,7 +101,56 @@ def buf(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     _logger.info(f"Saving {outfile}")
     plt.savefig(outfile)
 
-    # Buffer diff generator - yields 3-tuple list of the 3 rates in buffers/s
+    bufrates = calc_bufrates(data, blcksz)
+
+    # Plot buffer rates
+    plt, fig = plot.setup()
+    plt.suptitle(f"pg_statviz · {info['hostname']}:{port}",
+                 fontweight='semibold')
+    plt.title("Buffer write rate")
+    plt.plot_date(tstamps, bufrates['total'], label="total", aa=True,
+                  linestyle='solid')
+    plt.plot_date(tstamps, bufrates['checkpoints'], label="checkpoints",
+                  aa=True, linestyle='solid')
+    plt.plot_date(tstamps, bufrates['bgwriter'], label="bgwriter", aa=True,
+                  linestyle='solid')
+    plt.plot_date(tstamps, bufrates['backends'], label="backends", aa=True,
+                  linestyle='solid')
+
+    plt.xlabel("Timestamp", fontweight='semibold')
+    plt.ylabel("Avg. write rate in MB/s", fontweight='semibold')
+    fig.legend()
+    fig.tight_layout()
+    outfile = f"""{outputdir.rstrip("/") + "/" if outputdir
+        else ''}pg_statviz_{info['hostname']
+        .replace("/", "-")}_{port}_buf_rate.png"""
+    _logger.info(f"Saving {outfile}")
+    plt.savefig(outfile)
+
+
+# Gather buffers and convert to GB
+def calc_buffers(data, blcksz=8192):
+    bufs = {}
+    bufs['total'] = [round((b['buffers_checkpoint']
+                            + b['buffers_clean']
+                            + b['buffers_backend'])
+                           * blcksz / 1073741824, 1) for b in data]
+    bufs['checkpoints'] = [round(b['buffers_checkpoint']
+                                 * blcksz / 1073741824, 1) for b in data]
+    bufs['bgwriter'] = [round(b['buffers_clean']
+                              * blcksz / 1073741824, 1) for b in data]
+    bufs['backends'] = [round(b['buffers_backend']
+                              * blcksz / 1073741824, 1) for b in data]
+    print(bufs)
+    return bufs
+
+
+# Calculate buffer rates
+def calc_bufrates(data, blcksz=8192):
+    rates = {}
+
+    # Buffer diff generator - yields 3-tuple list of the 3 rates in
+    # buffers/s
     def bufdiff(data):
         yield (numpy.nan, numpy.nan, numpy.nan)
         for i, item in enumerate(data):
@@ -127,39 +166,20 @@ def buf(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                            - data[i]['buffers_backend']) / s)
                 else:
                     yield (numpy.nan, numpy.nan, numpy.nan)
-    buffers = list(bufdiff(data))
+
+    bufs = list(bufdiff(data))
 
     # Normalize and round the rate data
-    total = [round((b[0] + b[1] + b[2]) * blcksz / 1048576,
-                   1 if b[0] >= 100 else 2)
-             for b in buffers]
-    checkpoints = [round(b[0] * blcksz / 1048576, 1 if b[0] >= 100 else 2)
-                   for b in buffers]
-    bgwriter = [round(b[1] * blcksz / 1048576, 1 if b[0] >= 100 else 2)
-                for b in buffers]
-    backends = [round(b[2] * blcksz / 1048576, 1 if b[0] >= 100 else 2)
-                for b in buffers]
-
-    # Plot buffer rates
-    plt, fig = plot.setup()
-    plt.suptitle(f"pg_statviz · {info['hostname']}:{port}",
-                 fontweight='semibold')
-    plt.title("Buffer write rate")
-    plt.plot_date(tstamps, total, label="total", aa=True,
-                  linestyle='solid')
-    plt.plot_date(tstamps, checkpoints, label="checkpoints", aa=True,
-                  linestyle='solid')
-    plt.plot_date(tstamps, bgwriter, label="bgwriter", aa=True,
-                  linestyle='solid')
-    plt.plot_date(tstamps, backends, label="backends", aa=True,
-                  linestyle='solid')
-
-    plt.xlabel("Timestamp", fontweight='semibold')
-    plt.ylabel("Avg. write rate in MB/s", fontweight='semibold')
-    fig.legend()
-    fig.tight_layout()
-    outfile = f"""{outputdir.rstrip("/") + "/" if outputdir
-        else ''}pg_statviz_{info['hostname']
-        .replace("/", "-")}_{port}_buf_rate.png"""
-    _logger.info(f"Saving {outfile}")
-    plt.savefig(outfile)
+    rates['total'] = [round((b[0] + b[1] + b[2]) * blcksz / 1048576,
+                            1 if b[0] >= 100 else 2)
+                      for b in bufs]
+    rates['checkpoints'] = [round(b[0] * blcksz / 1048576,
+                                  1 if b[0] >= 100 else 2)
+                            for b in bufs]
+    rates['bgwriter'] = [round(b[1] * blcksz / 1048576,
+                               1 if b[0] >= 100 else 2)
+                         for b in bufs]
+    rates['backends'] = [round(b[2] * blcksz / 1048576,
+                               1 if b[0] >= 100 else 2)
+                         for b in bufs]
+    return rates

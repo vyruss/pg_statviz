@@ -72,18 +72,16 @@ def checkp(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
         raise SystemExit("No pg_statviz snapshots found in this database")
 
     tstamps = [t['snapshot_tstamp'] for t in data]
-    req = [c['checkpoints_req'] for c in data]
-    timed = [c['checkpoints_timed'] for c in data]
+    checkps = calc_checkps(data)
 
     # Plot checkpoints
     plt, fig = plot.setup()
     plt.suptitle(f"pg_statviz · {info['hostname']}:{port}",
                  fontweight='semibold')
     plt.title("Checkpoints")
-
-    plt.plot_date(tstamps, req, label="Requested", aa=True,
+    plt.plot_date(tstamps, checkps['req'], label="Requested", aa=True,
                   linestyle='solid')
-    plt.plot_date(tstamps, timed, label="Timed", aa=True,
+    plt.plot_date(tstamps, checkps['timed'], label="Timed", aa=True,
                   linestyle='solid')
     plt.xlabel("Timestamp", fontweight='semibold')
     plt.ylabel("Checkpoints (since stats reset)", fontweight='semibold')
@@ -97,6 +95,37 @@ def checkp(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
         .replace("/", "-")}_{port}_checkp.png"""
     _logger.info(f"Saving {outfile}")
     plt.savefig(outfile)
+
+    checkprates = calc_checkprates(data)
+
+    # Plot WAL rates
+    plt, fig = plot.setup()
+    plt.suptitle(f"pg_statviz · {info['hostname']}:{port}",
+                 fontweight='semibold')
+    plt.title("Checkpoint rate")
+    plt.plot_date(tstamps, checkprates['req'], label="requested",
+                  aa=True, linestyle='solid')
+    plt.plot_date(tstamps, checkprates['timed'], label="timed",
+                  aa=True, linestyle='solid')
+    plt.xlabel("Timestamp", fontweight='semibold')
+    plt.ylabel("Avg. checkpoints per minute", fontweight='semibold')
+    fig.legend()
+    fig.tight_layout()
+    outfile = f"""{outputdir.rstrip("/") + "/" if outputdir
+        else ''}pg_statviz_{info['hostname']
+        .replace("/", "-")}_{port}_checkp_rate.png"""
+    _logger.info(f"Saving {outfile}")
+    plt.savefig(outfile)
+
+
+# Gather checkpoint data
+def calc_checkps(data):
+    return {'req': [c['checkpoints_req'] for c in data],
+            'timed': [c['checkpoints_timed'] for c in data]}
+
+
+# Calculate checkpoint rates
+def calc_checkprates(data):
 
     # Checkpoint diff generator - yields tuple list of the rates in
     # checkpoints/minute
@@ -113,23 +142,6 @@ def checkp(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                                   - data[i]['checkpoints_timed']) / m, 1))
                 else:
                     yield (numpy.nan, numpy.nan)
-    checkprates = list(checkpdiff(data))
-
-    # Plot WAL rates
-    plt, fig = plot.setup()
-    plt.suptitle(f"pg_statviz · {info['hostname']}:{port}",
-                 fontweight='semibold')
-    plt.title("Checkpoint rate")
-    plt.plot_date(tstamps, [c[0] for c in checkprates], label="requested",
-                  aa=True, linestyle='solid')
-    plt.plot_date(tstamps, [c[1] for c in checkprates], label="timed",
-                  aa=True, linestyle='solid')
-    plt.xlabel("Timestamp", fontweight='semibold')
-    plt.ylabel("Avg. checkpoints per minute", fontweight='semibold')
-    fig.legend()
-    fig.tight_layout()
-    outfile = f"""{outputdir.rstrip("/") + "/" if outputdir
-        else ''}pg_statviz_{info['hostname']
-        .replace("/", "-")}_{port}_checkp_rate.png"""
-    _logger.info(f"Saving {outfile}")
-    plt.savefig(outfile)
+    rates = list(checkpdiff(data))
+    return {'req': [c[0] for c in rates],
+            'timed': [c[1] for c in rates]}
