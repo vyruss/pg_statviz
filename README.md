@@ -114,6 +114,7 @@ Or all snapshots can be removed like this:
     NOTICE:  truncate cascades to table "wait"                
     NOTICE:  truncate cascades to table "wal"
     NOTICE:  truncate cascades to table "db"
+    NOTICE:  truncate cascades to table "io"
      delete_snapshots 
     ------------------
 
@@ -141,39 +142,39 @@ The visualization utility can be called like a PostgreSQL command line tool:
 
 [comment]::
 
-    usage: pg_statviz [--help] [--version] [-d DBNAME] [-h HOSTNAME] [-p PORT] [-U USERNAME] [-W]
-                      [-D FROM TO] [-O OUTPUTDIR]
-                      {analyze,buf,cache,checkp,conn,lock,tuple,wait,wal,xact} ...
-    
+    usage: run_pg_statviz [--help] [--version] [-d DBNAME] [-h HOSTNAME] [-p PORT] [-U USERNAME]
+                          [-W] [-D FROM TO] [-O OUTPUTDIR]
+                          {analyze,buf,cache,checkp,conn,io,lock,tuple,wait,wal,xact} ...
+
     run all analysis modules
-    
+
     positional arguments:
-      {analyze,buf,cache,checkp,conn,tuple,wait,wal,xact}
+      {analyze,buf,cache,checkp,conn,io,lock,tuple,wait,wal,xact}
         analyze             run all analysis modules
         buf                 run buffers written analysis module
         cache               run cache hit ratio analysis module
         checkp              run checkpoint analysis module
         conn                run connection count analysis module
+        io                  run I/O analysis module
         lock                run locks analysis module
         tuple               run tuple count analysis module
         wait                run wait events analysis module
         wal                 run WAL generation analysis module
         xact                run transaction count analysis module
-   
+
     options:
       --help
       --version             show program's version number and exit
       -d DBNAME, --dbname DBNAME
-                            database name to analyze (default: 'myuser')
+                            database name to analyze (default: 'vyruss')
       -h HOSTNAME, --host HOSTNAME
                             database server host or socket directory (default: '/var/run/postgresql')
       -p PORT, --port PORT  database server port (default: '5432')
       -U USERNAME, --username USERNAME
-                            database user name (default: 'myuser')
+                            database user name (default: 'vyruss')
       -W, --password        force password prompt (should happen automatically) (default: False)
       -D FROM TO, --daterange FROM TO
-                            date range to be analyzed in ISO 8601 format e.g. 2023-01-01T00:00
-                            2023-01-01T23:59 (default: [])
+                            date range to be analyzed in ISO 8601 format e.g. 2023-01-01T00:002023-01-01T23:59 (default: [])
       -O OUTPUTDIR, --outputdir OUTPUTDIR
                             output directory (default: -)
 
@@ -228,6 +229,7 @@ Table | Description
 `pgstatviz.conf` | PostgreSQL server configuration data
 `pgstatviz.conn` | Connection data
 `pgstatviz.db` | PostgreSQL server and database statistics
+`pgstatviz.io` | I/O stats data
 `pgstatviz.lock` | Locks data
 `pgstatviz.wait` | Wait events data 
 `pgstatviz.wal` | WAL generation data
