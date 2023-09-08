@@ -168,7 +168,8 @@ def io(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                       f"{iokind['context']}")
         if not all(numpy.isnan(v) or v == 0
                    for v in iorates['reads'][iokindname]):
-            splt1.plot_date(tstamps, iorates['reads'][iokindname],
+            splt1.plot_date(tstamps, [round(v / 1048576, 1 if v >= 100 else 2)
+                                      for v in iorates['writes'][iokindname]],
                             label=iokindname, aa=True, linestyle='solid')
     splt1.set_xlabel("Timestamp", fontweight='semibold')
     splt1.set_ylabel("Avg. read rate in MB/s", fontweight='semibold')
@@ -185,7 +186,8 @@ def io(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                       f"{iokind['context']}")
         if not all(numpy.isnan(v) or v == 0
                    for v in iorates['writes'][iokindname]):
-            splt2.plot_date(tstamps, iorates['writes'][iokindname],
+            splt2.plot_date(tstamps, [round(v / 1048576, 1 if v >= 100 else 2)
+                                      for v in iorates['writes'][iokindname]],
                             label=iokindname, aa=True, linestyle='solid')
     splt2.set_xlabel("Timestamp", fontweight='semibold')
     splt2.set_ylabel("Avg. write rate in MB/s", fontweight='semibold')
@@ -231,8 +233,7 @@ def calc_iorates(data, iokinds, blcksz=8192):
         yield numpy.nan
         for i, item in enumerate(data):
             if i + 1 < len(data):
-                if (data[i + 1]['io_stats'][0]['stats_reset']
-                        == data[i]['io_stats'][0]['stats_reset']):
+                if (data[i + 1]['stats_reset'] == data[i]['stats_reset']):
                     s = ((data[i + 1]['snapshot_tstamp']
                          - data[i]['snapshot_tstamp'])
                          .total_seconds())
@@ -258,8 +259,5 @@ def calc_iorates(data, iokinds, blcksz=8192):
                       if {iokind['object']} == 'temp relation'
                       else ""
                       f"{iokind['backend_type']}/"
-                      f"{iokind['context']}"] = [round(v / 1048576,
-                                                       1 if v >= 100 else 2)
-                                                 for v in list(
-                                                     iodiff(data, iokind, rw))]
+                      f"{iokind['context']}"] = list(iodiff(data, iokind, rw))
     return rates

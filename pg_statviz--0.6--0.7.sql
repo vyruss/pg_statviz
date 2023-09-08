@@ -127,8 +127,7 @@ BEGIN
                         evictions,
                         reuses,
                         fsyncs,
-                        fsync_time,
-                        stats_reset
+                        fsync_time
                     FROM pg_stat_io
                     WHERE NOT (reads = 0 AND writes = 0)),
                 ioagg AS (       
