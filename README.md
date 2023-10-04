@@ -142,9 +142,9 @@ The visualization utility can be called like a PostgreSQL command line tool:
 
 [comment]::
 
-    usage: run_pg_statviz [--help] [--version] [-d DBNAME] [-h HOSTNAME] [-p PORT] [-U USERNAME]
-                          [-W] [-D FROM TO] [-O OUTPUTDIR]
-                          {analyze,buf,cache,checkp,conn,io,lock,tuple,wait,wal,xact} ...
+    usage: pg_statviz [--help] [--version] [-d DBNAME] [-h HOSTNAME] [-p PORT] [-U USERNAME]
+                      [-W] [-D FROM TO] [-O OUTPUTDIR]
+                      {analyze,buf,cache,checkp,conn,io,lock,tuple,wait,wal,xact} ...
 
     run all analysis modules
 
