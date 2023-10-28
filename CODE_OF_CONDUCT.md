@@ -1,6 +1,6 @@
 # Contributor Code of Conduct
 
-The pg_statviz projcet fully agrees with, embraces and supports the standards, values and rules of the PostgreSQL Code of Conduct found at:
+The pg_statviz project fully agrees with, embraces and supports the standards, values and rules of the PostgreSQL Code of Conduct found at:
 
 * https://www.postgresql.org/about/policies/coc/
 
