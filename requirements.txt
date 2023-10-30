@@ -1,4 +1,4 @@
-argh==0.29.3
+argh==0.30.3
 contourpy==1.1.1
 cycler==0.12.1
 fonttools==4.43.1
