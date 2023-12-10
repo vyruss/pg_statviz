@@ -64,7 +64,7 @@ def xact(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                           stats_reset
                    FROM pgstatviz.db
                    WHERE snapshot_tstamp BETWEEN %s AND %s
-                   ORDER BY snapshot_tstamp""",
+                   ORDER BY snapshot_tstamp DESC""",
                 (daterange[0], daterange[1]))
     data = cur.fetchmany(MAX_RESULTS)
     if not data:

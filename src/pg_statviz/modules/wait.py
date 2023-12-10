@@ -63,7 +63,7 @@ def wait(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     cur.execute("""SELECT wait_events_total, wait_events, snapshot_tstamp
                    FROM pgstatviz.wait
                    WHERE snapshot_tstamp BETWEEN %s AND %s
-                   ORDER BY snapshot_tstamp""",
+                   ORDER BY snapshot_tstamp DESC""",
                 (daterange[0], daterange[1]))
     data = cur.fetchmany(MAX_RESULTS)
     if not data:

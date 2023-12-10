@@ -63,7 +63,7 @@ def lock(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     cur.execute("""SELECT locks_total, locks, snapshot_tstamp
                    FROM pgstatviz.lock
                    WHERE snapshot_tstamp BETWEEN %s AND %s
-                   ORDER BY snapshot_tstamp""",
+                   ORDER BY snapshot_tstamp DESC""",
                 (daterange[0], daterange[1]))
     data = cur.fetchmany(MAX_RESULTS)
     if not data:
