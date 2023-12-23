@@ -166,12 +166,12 @@ The visualization utility can be called like a PostgreSQL command line tool:
       --help
       --version             show program's version number and exit
       -d DBNAME, --dbname DBNAME
-                            database name to analyze (default: 'vyruss')
+                            database name to analyze (default: 'myuser')
       -h HOSTNAME, --host HOSTNAME
                             database server host or socket directory (default: '/var/run/postgresql')
       -p PORT, --port PORT  database server port (default: '5432')
       -U USERNAME, --username USERNAME
-                            database user name (default: 'vyruss')
+                            database user name (default: 'myuser')
       -W, --password        force password prompt (should happen automatically) (default: False)
       -D FROM TO, --daterange FROM TO
                             date range to be analyzed in ISO 8601 format e.g. 2023-01-01T00:002023-01-01T23:59 (default: [])
