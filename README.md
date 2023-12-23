@@ -132,7 +132,7 @@ Periodic snapshots can be set up with any job scheduler. For example with `cron`
 
 Inside the `postgres` user's crontab, add this line to take a snapshot every 15 minutes:
 
-    */15 * * * * psql -c "SELECT pgstatviz.snapshot()" >/dev/null 2>&1
+    */15 * * * * psql -c -d mydatabase "SELECT pgstatviz.snapshot()" >/dev/null 2>&1
 
 ## Visualization
 
