@@ -3,7 +3,7 @@ pg_statviz - stats visualization and time series analysis
 """
 
 __author__ = "Jimmy Angelakos"
-__copyright__ = "Copyright (c) 2023 Jimmy Angelakos"
+__copyright__ = "Copyright (c) 2024 Jimmy Angelakos"
 __license__ = "PostgreSQL License"
 
 import importlib.resources

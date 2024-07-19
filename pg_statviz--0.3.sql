@@ -1,7 +1,7 @@
 /*
 // pg_statviz - stats visualization and time series analysis
 //
-// Copyright (c) 2023 Jimmy Angelakos
+// Copyright (c) 2024 Jimmy Angelakos
 // This software is released under the PostgreSQL Licence
 //
 // pg_statviz--0.3 - Release v0.3
