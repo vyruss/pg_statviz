@@ -31,12 +31,12 @@ from pg_statviz.libs.info import getinfo
 @arg('-O', '--outputdir', help="output directory")
 @arg('--info', help=argparse.SUPPRESS)
 @arg('--conn', help=argparse.SUPPRESS)
-def buf(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
+def buf(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
         username=getpass.getuser(), password=False, daterange=[],
         outputdir=None, info=None, conn=None):
     "run buffers written analysis module"
 
-    MAX_RESULTS = 1000
+    MAX_RESULTS = 100000
 
     logging.basicConfig()
     _logger = logging.getLogger(__name__)

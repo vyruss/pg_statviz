@@ -2,6 +2,62 @@
 // pg_statviz--0.6--0.7.sql - Upgrade extension to 0.7
 */
 
+-- Configuration
+CREATE OR REPLACE FUNCTION @extschema@.snapshot_conf(snapshot_tstamp timestamptz)
+RETURNS void
+AS $$
+    INSERT INTO @extschema@.conf (
+        snapshot_tstamp,
+        conf)
+    SELECT
+        snapshot_tstamp,
+        jsonb_object_agg("variable", "value")
+    FROM (
+        SELECT "name" AS "variable",
+               "setting" AS "value"
+        FROM pg_settings
+        WHERE "name" IN (
+            'autovacuum',
+            'autovacuum_max_workers',
+            'autovacuum_naptime',
+            'autovacuum_work_mem',
+            'bgwriter_delay',
+            'bgwriter_lru_maxpages',
+            'bgwriter_lru_multiplier',
+            'checkpoint_completion_target',
+            'checkpoint_timeout',
+            'max_connections',
+            'max_wal_size',
+            'max_wal_senders',
+            'work_mem',
+            'maintenance_work_mem',
+            'max_replication_slots',
+            'max_parallel_workers',
+            'max_parallel_maintenance_workers',
+            'server_version_num',
+            'shared_buffers',
+            'vacuum_cost_delay',
+            'vacuum_cost_limit')) s;
+$$ LANGUAGE SQL;
+
+---- Convert existing data
+CREATE TABLE IF NOT EXISTS @extschema@._upgrade_conf(
+    snapshot_tstamp timestamptz REFERENCES @extschema@.snapshots(snapshot_tstamp) ON DELETE CASCADE PRIMARY KEY,
+    conf jsonb);
+
+INSERT INTO @extschema@._upgrade_conf
+SELECT snapshot_tstamp, jsonb_object_agg(j.x->>'setting', j.x->>'value')
+FROM (SELECT * FROM @extschema@.conf) s
+CROSS JOIN jsonb_array_elements(conf) AS j(x)
+GROUP BY snapshot_tstamp;
+
+BEGIN
+    DROP TABLE @extschema@.conf;
+    ALTER TABLE @extschema@._upgrade_conf
+    RENAME TO @extschema@.conf;
+COMMIT;
+
+
 -- pg_stat_wal only exists in PG14+
 DO $block$
 BEGIN
@@ -111,7 +167,7 @@ BEGIN
         AS $$
             WITH
                 pgsi AS (
-                    SELECT 
+                    SELECT
                         backend_type,
                         object,
                         context,
@@ -127,10 +183,11 @@ BEGIN
                         evictions,
                         reuses,
                         fsyncs,
-                        fsync_time
+                        fsync_time,
+                        stats_reset
                     FROM pg_stat_io
                     WHERE NOT (reads = 0 AND writes = 0)),
-                ioagg AS (       
+                ioagg AS (
                     SELECT jsonb_agg(io)
                     FROM (SELECT *
                           FROM pgsi) io)
@@ -138,9 +195,9 @@ BEGIN
                     snapshot_tstamp,
                     io_stats,
                     stats_reset)
-            SELECT snapshot_tstamp, 
+            SELECT snapshot_tstamp,
                    (SELECT * FROM ioagg) AS io_stats,
-                   (SELECT stats_reset FROM pgsi LIMIT 1) AS stats_reset;  
+                   (SELECT stats_reset FROM pgsi LIMIT 1) AS stats_reset;
         $$ LANGUAGE SQL;
     END IF;
 END

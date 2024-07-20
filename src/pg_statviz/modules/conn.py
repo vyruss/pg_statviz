@@ -9,7 +9,6 @@ __license__ = "PostgreSQL License"
 import argparse
 import getpass
 import logging
-import psycopg2
 from argh.decorators import arg
 from dateutil.parser import isoparse
 from matplotlib.ticker import MaxNLocator
@@ -33,7 +32,7 @@ from pg_statviz.libs.info import getinfo
 @arg('--conn', help=argparse.SUPPRESS)
 @arg('-u', '--users', help="user name(s) to plot in analysis",
      nargs='*', type=str)
-def conn(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
+def conn(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
          username=getpass.getuser(), password=False, daterange=[],
          outputdir=None, info=None, conn=None, users=[]):
     "run connection count analysis module"
@@ -62,7 +61,6 @@ def conn(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
         daterange = ['-infinity', 'now()']
 
     # Retrieve the snapshots from DB
-    psycopg2.extensions.register_adapter(dict, psycopg2.extras.Json)
     cur = conn.cursor()
     cur.execute("""SELECT conn_total, conn_active, conn_idle, conn_idle_trans,
                           conn_idle_trans_abort, conn_fastpath, conn_users,

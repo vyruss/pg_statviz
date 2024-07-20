@@ -1,4 +1,4 @@
-from psycopg2.extras import DictRow
+from psycopg.rows import DictRow
 
 
 class MockDictRow:

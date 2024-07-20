@@ -31,7 +31,7 @@ from pg_statviz.libs.info import getinfo
 @arg('-O', '--outputdir', help="output directory")
 @arg('--info', help=argparse.SUPPRESS)
 @arg('--conn', help=argparse.SUPPRESS)
-def checkp(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
+def checkp(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
            username=getpass.getuser(), password=False, daterange=[],
            outputdir=None, info=None, conn=None):
     "run checkpoint analysis module"

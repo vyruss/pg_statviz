@@ -8,8 +8,8 @@ __license__ = "PostgreSQL License"
 
 import getpass
 import logging
-import psycopg2
-from psycopg2.extras import DictCursor
+import psycopg
+from psycopg.rows import dict_row
 
 
 logging.basicConfig()
@@ -23,9 +23,9 @@ def dbconn(dbname, user, password, host, port):
                     'password': password, 'host': host, 'port': port}
     while True:
         try:
-            conn = psycopg2.connect(**conn_details, cursor_factory=DictCursor)
+            conn = psycopg.connect(**conn_details, row_factory=dict_row)
             return conn
-        except psycopg2.errors.OperationalError as e:
+        except psycopg.errors.OperationalError as e:
             if "auth" in str(e):
                 conn_details['password'] = getpass.getpass("Password: ")
             else:
