@@ -26,22 +26,18 @@ def getinfo(conn):
         if not cur.fetchone():
             raise SystemExit("pg_statviz extension is not installed in this "
                              + "database")
-        cur.execute("""CREATE TEMP TABLE _info(hostname text);
-                       COPY _info FROM PROGRAM 'hostname';
-                       SELECT hostname,
-                              inet_server_addr()
+        cur.execute("""CREATE TEMP TABLE _info(hostname text)""")
+        cur.execute("""COPY _info
+                       FROM PROGRAM 'hostname'""")
+        cur.execute("""SELECT hostname
                        FROM _info""")
-        info['hostname'], info['inet_server_addr'], info['block_size'] \
-            = cur.fetchone()
+        info['hostname'] = cur.fetchone()
         cur.close()
     except (ExternalRoutineException, InsufficientPrivilege) as e:
         conn.rollback()
         cur = conn.cursor()
         _logger.warning("Context: getting hostname")
         _logger.warning(e)
-        cur.execute("""SELECT inet_server_addr(),
-                              current_setting('block_size')""")
-        info['inet_server_addr'], info['block_size'] = cur.fetchone()
         info['hostname'] = conn.info.host
         _logger.info(f"""Setting hostname to "{info['hostname']}" """)
         cur.close()
