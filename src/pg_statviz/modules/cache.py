@@ -11,9 +11,11 @@ import getpass
 import logging
 from argh.decorators import arg
 from dateutil.parser import isoparse
+from matplotlib.pyplot import close as mpclose
 from pg_statviz.libs import plot
 from pg_statviz.libs.dbconn import dbconn
 from pg_statviz.libs.info import getinfo
+from pandas import DataFrame
 
 
 @arg('-d', '--dbname', help="database name to analyze")
@@ -33,8 +35,6 @@ def cache(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
           username=getpass.getuser(), password=False, daterange=[],
           outputdir=None, info=None, conn=None):
     "run cache hit ratio analysis module"
-
-    MAX_RESULTS = 1000
 
     logging.basicConfig()
     _logger = logging.getLogger(__name__)
@@ -63,12 +63,21 @@ def cache(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                    WHERE snapshot_tstamp BETWEEN %s AND %s
                    ORDER BY snapshot_tstamp""",
                 (daterange[0], daterange[1]))
-    data = cur.fetchmany(MAX_RESULTS)
+    data = cur.fetchall()
     if not data:
         raise SystemExit("No pg_statviz snapshots found in this database")
 
     tstamps = [t['snapshot_tstamp'] for t in data]
     ratio = calc_ratio(data)
+
+    # Downsample if needed
+    ratio_frame = DataFrame(data=ratio, index=tstamps, copy=False)
+    if len(tstamps) > plot.MAX_POINTS:
+        q = str(round(
+            (tstamps[-1] - tstamps[0]).total_seconds() / plot.MAX_POINTS, 2))
+        r = ratio_frame.resample(q + "s").mean()
+    else:
+        r = ratio_frame
 
     # Plot cache hit ratio
     plt, fig = plot.setup()
@@ -76,7 +85,7 @@ def cache(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                  fontweight='semibold')
     plt.title("Cache hit ratio")
 
-    plt.plot_date(tstamps, ratio, label="hit ratio", aa=True,
+    plt.plot_date(r.index, r, label="hit ratio", aa=True,
                   linestyle='solid')
 
     plt.xlabel("Timestamp", fontweight='semibold')
@@ -84,11 +93,13 @@ def cache(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     fig.axes[0].set_ylim(top=100)
     fig.legend()
     fig.tight_layout()
-    outfile = f"""{outputdir.rstrip("/") + "/" if outputdir
+    outfile = f"""{
+        outputdir.rstrip("/") + "/" if outputdir
         else ''}pg_statviz_{info['hostname']
-        .replace("/", "-")}_{port}_cache.png"""
+                            .replace("/", "-")}_{port}_cache.png"""
     _logger.info(f"Saving {outfile}")
     plt.savefig(outfile)
+    mpclose('all')
 
 
 # Calculate cache hit ratio

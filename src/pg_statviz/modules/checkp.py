@@ -12,7 +12,9 @@ import logging
 import numpy
 from argh.decorators import arg
 from dateutil.parser import isoparse
+from matplotlib.pyplot import close as mpclose
 from matplotlib.ticker import MaxNLocator
+from pandas import DataFrame
 from pg_statviz.libs import plot
 from pg_statviz.libs.dbconn import dbconn
 from pg_statviz.libs.info import getinfo
@@ -31,12 +33,10 @@ from pg_statviz.libs.info import getinfo
 @arg('-O', '--outputdir', help="output directory")
 @arg('--info', help=argparse.SUPPRESS)
 @arg('--conn', help=argparse.SUPPRESS)
-def checkp(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
-           username=getpass.getuser(), password=False, daterange=[],
-           outputdir=None, info=None, conn=None):
+def checkp(*, dbname=getpass.getuser(), host="/var/run/postgresql",
+           port="5432", username=getpass.getuser(), password=False,
+           daterange=[], outputdir=None, info=None, conn=None):
     "run checkpoint analysis module"
-
-    MAX_RESULTS = 1000
 
     logging.basicConfig()
     _logger = logging.getLogger(__name__)
@@ -67,21 +67,34 @@ def checkp(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                    WHERE snapshot_tstamp BETWEEN %s AND %s
                    ORDER BY snapshot_tstamp""",
                 (daterange[0], daterange[1]))
-    data = cur.fetchmany(MAX_RESULTS)
+    data = cur.fetchall()
     if not data:
         raise SystemExit("No pg_statviz snapshots found in this database")
 
     tstamps = [t['snapshot_tstamp'] for t in data]
     checkps = calc_checkps(data)
+    checkprates = calc_checkprates(data)
+
+    # Downsample if needed
+    checkps_frame = DataFrame(data=checkps, index=tstamps, copy=False)
+    checkprates_frame = DataFrame(data=checkprates, index=tstamps, copy=False)
+    if len(tstamps) > plot.MAX_POINTS:
+        q = str(round(
+            (tstamps[-1] - tstamps[0]).total_seconds() / plot.MAX_POINTS, 2))
+        r = checkps_frame.resample(q + "s").mean()
+        rr = checkprates_frame.resample(q + "s").mean()
+    else:
+        r = checkps_frame
+        rr = checkprates_frame
 
     # Plot checkpoints
     plt, fig = plot.setup()
     plt.suptitle(f"pg_statviz · {info['hostname']}:{port}",
                  fontweight='semibold')
     plt.title("Checkpoints")
-    plt.plot_date(tstamps, checkps['req'], label="Requested", aa=True,
+    plt.plot_date(r.index, r['req'], label="Requested", aa=True,
                   linestyle='solid')
-    plt.plot_date(tstamps, checkps['timed'], label="Timed", aa=True,
+    plt.plot_date(r.index, r['timed'], label="Timed", aa=True,
                   linestyle='solid')
     plt.xlabel("Timestamp", fontweight='semibold')
     plt.ylabel("Checkpoints (since stats reset)", fontweight='semibold')
@@ -90,32 +103,33 @@ def checkp(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     fig.gca().yaxis.set_major_locator(MaxNLocator(integer=True))
     fig.legend()
     fig.tight_layout()
-    outfile = f"""{outputdir.rstrip("/") + "/" if outputdir
+    outfile = f"""{
+        outputdir.rstrip("/") + "/" if outputdir
         else ''}pg_statviz_{info['hostname']
-        .replace("/", "-")}_{port}_checkp.png"""
+                            .replace("/", "-")}_{port}_checkp.png"""
     _logger.info(f"Saving {outfile}")
     plt.savefig(outfile)
-
-    checkprates = calc_checkprates(data)
 
     # Plot WAL rates
     plt, fig = plot.setup()
     plt.suptitle(f"pg_statviz · {info['hostname']}:{port}",
                  fontweight='semibold')
     plt.title("Checkpoint rate")
-    plt.plot_date(tstamps, checkprates['req'], label="requested",
+    plt.plot_date(rr.index, rr['req'], label="requested",
                   aa=True, linestyle='solid')
-    plt.plot_date(tstamps, checkprates['timed'], label="timed",
+    plt.plot_date(rr.index, rr['timed'], label="timed",
                   aa=True, linestyle='solid')
     plt.xlabel("Timestamp", fontweight='semibold')
     plt.ylabel("Avg. checkpoints per minute", fontweight='semibold')
     fig.legend()
     fig.tight_layout()
-    outfile = f"""{outputdir.rstrip("/") + "/" if outputdir
+    outfile = f"""{
+        outputdir.rstrip("/") + "/" if outputdir
         else ''}pg_statviz_{info['hostname']
-        .replace("/", "-")}_{port}_checkp_rate.png"""
+                            .replace("/", "-")}_{port}_checkp_rate.png"""
     _logger.info(f"Saving {outfile}")
     plt.savefig(outfile)
+    mpclose('all')
 
 
 # Gather checkpoint data
