@@ -11,7 +11,9 @@ import getpass
 import logging
 from argh.decorators import arg
 from dateutil.parser import isoparse
+from matplotlib.pyplot import close as mpclose
 from matplotlib.ticker import MaxNLocator
+from pandas import DataFrame
 from pg_statviz.libs import plot
 from pg_statviz.libs.dbconn import dbconn
 from pg_statviz.libs.info import getinfo
@@ -30,12 +32,10 @@ from pg_statviz.libs.info import getinfo
 @arg('-O', '--outputdir', help="output directory")
 @arg('--info', help=argparse.SUPPRESS)
 @arg('--conn', help=argparse.SUPPRESS)
-def lock(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
+def lock(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
          username=getpass.getuser(), password=False, daterange=[],
          outputdir=None, info=None, conn=None):
     "run locks analysis module"
-
-    MAX_RESULTS = 1000
 
     logging.basicConfig()
     _logger = logging.getLogger(__name__)
@@ -65,7 +65,7 @@ def lock(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                    WHERE snapshot_tstamp BETWEEN %s AND %s
                    ORDER BY snapshot_tstamp""",
                 (daterange[0], daterange[1]))
-    data = cur.fetchmany(MAX_RESULTS)
+    data = cur.fetchall()
     if not data:
         raise SystemExit("No pg_statviz snapshots found in this database")
 
@@ -97,20 +97,40 @@ def lock(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                     lc += c['lock_count'],
             if not found:
                 lc += 0,
-        if not all(c == 0 for c in lc):
-            plt.plot_date(tstamps, lc,
+        lc_frame = DataFrame(data={lm: lc}, index=tstamps, copy=False)
+        # Downsample if needed
+        if len(tstamps) > plot.MAX_POINTS:
+            q = str(round(
+                (tstamps[-1] - tstamps[0]).total_seconds()
+                / plot.MAX_POINTS, 2))
+            r = lc_frame.resample(q + "s").mean()
+        else:
+            r = lc_frame
+        if not all(c == 0 for c in r[lm]):
+            plt.plot_date(r.index, r[lm],
                           label=lm, aa=True, linestyle='solid')
+
     # Plot total locks
-    plt.plot_date(tstamps, total,
-                  label='Total', aa=True, linestyle='solid')
+    # # Downsample if needed
+    total_frame = DataFrame(data=total, index=tstamps, copy=False)
+    if len(tstamps) > plot.MAX_POINTS:
+        q = str(round(
+            (tstamps[-1] - tstamps[0]).total_seconds()
+            / plot.MAX_POINTS, 2))
+        rr = total_frame.resample(q + "s").mean()
+    else:
+        rr = total_frame
+    plt.plot_date(rr.index, rr, label='Total', aa=True, linestyle='solid')
     fig.axes[0].set_ylim(bottom=0)
     fig.gca().yaxis.set_major_locator(MaxNLocator(integer=True))
     plt.xlabel("Timestamp", fontweight='semibold')
     plt.ylabel("Lock count (at time of snapshot)", fontweight='semibold')
-    outfile = f"""{outputdir.rstrip("/") + "/" if outputdir
+    outfile = f"""{
+        outputdir.rstrip("/") + "/" if outputdir
         else ''}pg_statviz_{info['hostname']
-        .replace("/", "-")}_{port}_lock.png"""
+                            .replace("/", "-")}_{port}_lock.png"""
     _logger.info(f"Saving {outfile}")
     fig.legend()
     fig.tight_layout()
     plt.savefig(outfile)
+    mpclose('all')

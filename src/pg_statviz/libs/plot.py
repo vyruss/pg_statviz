@@ -11,6 +11,9 @@ import matplotlib.pyplot as plt
 import matplotlib.font_manager as fnt
 
 
+MAX_POINTS = 100
+
+
 def setup():
     for f in ["NotoSans-Regular.ttf", "NotoSans-SemiBold.ttf"]:
         f = importlib.resources.files("pg_statviz.libs").joinpath(f)

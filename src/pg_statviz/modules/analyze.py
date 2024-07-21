@@ -33,9 +33,9 @@ from pg_statviz.libs.info import getinfo
      help="date range to be analyzed in ISO 8601 format e.g. 2023-01-01T00:00 "
           + "2023-01-01T23:59")
 @arg('-O', '--outputdir', help="output directory")
-def analyze(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
-            username=getpass.getuser(), password=False, daterange=[],
-            outputdir=None):
+def analyze(*, dbname=getpass.getuser(), host="/var/run/postgresql",
+            port="5432", username=getpass.getuser(), password=False,
+            daterange=[], outputdir=None):
     "run all analysis modules"
 
     conn_details = {'dbname': dbname, 'user': username,

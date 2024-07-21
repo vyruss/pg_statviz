@@ -9,10 +9,11 @@ __license__ = "PostgreSQL License"
 import argparse
 import getpass
 import logging
-import psycopg2
 from argh.decorators import arg
 from dateutil.parser import isoparse
+from matplotlib.pyplot import close as mpclose
 from matplotlib.ticker import MaxNLocator
+from pandas import DataFrame
 from pg_statviz.libs import plot
 from pg_statviz.libs.dbconn import dbconn
 from pg_statviz.libs.info import getinfo
@@ -33,12 +34,10 @@ from pg_statviz.libs.info import getinfo
 @arg('--conn', help=argparse.SUPPRESS)
 @arg('-u', '--users', help="user name(s) to plot in analysis",
      nargs='*', type=str)
-def conn(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
+def conn(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
          username=getpass.getuser(), password=False, daterange=[],
          outputdir=None, info=None, conn=None, users=[]):
     "run connection count analysis module"
-
-    MAX_RESULTS = 1000
 
     logging.basicConfig()
     _logger = logging.getLogger(__name__)
@@ -62,7 +61,6 @@ def conn(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
         daterange = ['-infinity', 'now()']
 
     # Retrieve the snapshots from DB
-    psycopg2.extensions.register_adapter(dict, psycopg2.extras.Json)
     cur = conn.cursor()
     cur.execute("""SELECT conn_total, conn_active, conn_idle, conn_idle_trans,
                           conn_idle_trans_abort, conn_fastpath, conn_users,
@@ -71,7 +69,7 @@ def conn(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                    WHERE snapshot_tstamp BETWEEN %s AND %s
                    ORDER BY snapshot_tstamp""",
                 (daterange[0], daterange[1]))
-    data = cur.fetchmany(MAX_RESULTS)
+    data = cur.fetchall()
     if not data:
         raise SystemExit("No pg_statviz snapshots found in this database")
 
@@ -82,6 +80,22 @@ def conn(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     cit = [c['conn_idle_trans'] for c in data]
     cita = [c['conn_idle_trans_abort'] for c in data]
     cf = [c['conn_fastpath'] for c in data]
+
+    # Downsample if needed
+    conn_frame = DataFrame(
+        data={'total': total,
+              'ca': ca,
+              'ci': ci,
+              'cit': cit,
+              'cita': cita,
+              'cf': cf},
+        index=tstamps, copy=False)
+    if len(tstamps) > plot.MAX_POINTS:
+        q = str(round(
+            (tstamps[-1] - tstamps[0]).total_seconds() / plot.MAX_POINTS, 2))
+        r = conn_frame.resample(q + "s").mean()
+    else:
+        r = conn_frame
 
     # Get user names to plot
     if not users:
@@ -95,24 +109,24 @@ def conn(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     plt.suptitle(f"pg_statviz · {info['hostname']}:{port}",
                  fontweight='semibold')
     plt.title('Connection/status count')
-    plt.plot_date(tstamps, total,
+    plt.plot_date(r.index, r['total'],
                   label='total', aa=True, linestyle='solid')
-    if not all(c == 0 for c in ca):
-        plt.plot_date(tstamps, ca,
+    if not all(c == 0 for c in r['ca']):
+        plt.plot_date(r.index, r['ca'],
                       label='active', aa=True, linestyle='solid')
-    if not all(c == 0 for c in ci):
-        plt.plot_date(tstamps, ci,
+    if not all(c == 0 for c in r['ci']):
+        plt.plot_date(r.index, r['ci'],
                       label='idle', aa=True, linestyle='solid')
-    if not all(c == 0 for c in cit):
-        plt.plot_date(tstamps, cit,
+    if not all(c == 0 for c in r['cit']):
+        plt.plot_date(r.index, r['cit'],
                       label='idle in transaction', aa=True,
                       linestyle='solid')
-    if not all(c == 0 for c in cita):
-        plt.plot_date(tstamps, cita,
+    if not all(c == 0 for c in r['cita']):
+        plt.plot_date(r.index, r['cita'],
                       label='idle in transaction (aborted)', aa=True,
                       linestyle='solid')
-    if not all(c == 0 for c in cf):
-        plt.plot_date(tstamps, cf,
+    if not all(c == 0 for c in r['cf']):
+        plt.plot_date(r.index, r['cf'],
                       label='fastpath function call', aa=True,
                       linestyle='solid')
     plt.xlabel("Timestamp", fontweight='semibold')
@@ -122,9 +136,10 @@ def conn(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     fig.gca().yaxis.set_major_locator(MaxNLocator(integer=True))
     fig.legend()
     fig.tight_layout()
-    outfile = f"""{outputdir.rstrip("/") + "/" if outputdir
+    outfile = f"""{
+        outputdir.rstrip("/") + "/" if outputdir
         else ''}pg_statviz_{info['hostname']
-        .replace("/", "-")}_{port}_conn_status.png"""
+                            .replace("/", "-")}_{port}_conn_status.png"""
     _logger.info(f"Saving {outfile}")
     plt.savefig(outfile)
 
@@ -143,17 +158,27 @@ def conn(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                     uc += c['connections'],
             if not found:
                 uc += 0,
-        if not all(c == 0 for c in uc):
-            plt.plot_date(tstamps, uc,
-                          label=u, aa=True, linestyle='solid')
+        # Downsample if needed
+        uc_frame = DataFrame(data={u: uc}, index=tstamps, copy=False)
+        if len(tstamps) > plot.MAX_POINTS:
+            q = str(round(
+                (tstamps[-1] - tstamps[0]).total_seconds()
+                / plot.MAX_POINTS, 2))
+            rr = uc_frame.resample(q + "s").mean()
+        else:
+            rr = uc_frame
+        if not all(c == 0 for c in rr[u]):
+            plt.plot_date(rr.index, rr[u], label=u, aa=True, linestyle='solid')
     plt.xlabel("Timestamp", fontweight='semibold')
     plt.ylabel("No. of connections", fontweight='semibold')
     fig.axes[0].set_ylim(bottom=0)
     fig.gca().yaxis.set_major_locator(MaxNLocator(integer=True))
     fig.legend()
     fig.tight_layout()
-    outfile = f"""{outputdir.rstrip("/") + "/" if outputdir
+    outfile = f"""{
+        outputdir.rstrip("/") + "/" if outputdir
         else ''}pg_statviz_{info['hostname']
-        .replace("/", "-")}_{port}_conn_user.png"""
+                            .replace("/", "-")}_{port}_conn_user.png"""
     _logger.info(f"Saving {outfile}")
     plt.savefig(outfile)
+    mpclose('all')

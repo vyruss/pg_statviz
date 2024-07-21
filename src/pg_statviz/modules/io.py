@@ -12,7 +12,9 @@ import logging
 import numpy
 from argh.decorators import arg
 from dateutil.parser import isoparse
+from matplotlib.pyplot import close as mpclose
 from matplotlib.ticker import MaxNLocator
+from pandas import DataFrame
 from pg_statviz.libs import plot
 from pg_statviz.libs.dbconn import dbconn
 from pg_statviz.libs.info import getinfo
@@ -31,12 +33,10 @@ from pg_statviz.libs.info import getinfo
 @arg('-O', '--outputdir', help="output directory")
 @arg('--info', help=argparse.SUPPRESS)
 @arg('--conn', help=argparse.SUPPRESS)
-def io(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
+def io(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
        username=getpass.getuser(), password=False, daterange=[],
        outputdir=None, info=None, conn=None):
     "run I/O analysis module"
-
-    MAX_RESULTS = 1000
 
     logging.basicConfig()
     _logger = logging.getLogger(__name__)
@@ -68,13 +68,14 @@ def io(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                    ORDER BY snapshot_tstamp""",
                 (daterange[0], daterange[1]))
 
-    data = cur.fetchmany(MAX_RESULTS)
+    data = cur.fetchall()
     if not data:
         raise SystemExit("No pg_statviz snapshots found in this database")
 
     tstamps = [ts['snapshot_tstamp'] for ts in data]
     blcksz = int(data[0]['block_size'])
     iostats, iokinds = calc_iostats(data, blcksz)
+    iorates = calc_iorates(data, iokinds, blcksz)
 
     # Plot as many of each I/O kinds we have per snapshot
     plt, fig, splt1, splt2 = plot.setupdouble()
@@ -100,7 +101,16 @@ def io(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
             if not found:
                 iobytes += 0,
         if not all(b == 0 for b in iobytes):
-            splt1.plot_date(tstamps, iobytes,
+            # Downsample if needed
+            _frame = DataFrame(data=iobytes, index=tstamps, copy=False)
+            if len(tstamps) > plot.MAX_POINTS:
+                q = str(round(
+                    (tstamps[-1] - tstamps[0]).total_seconds()
+                    / plot.MAX_POINTS, 2))
+                r = _frame.resample(q + "s").mean()
+            else:
+                r = _frame
+            splt1.plot_date(r.index, r,
                             label=f"{iokind['object']}/"
                                   if {iokind['object']} == 'temp relation'
                                   else ""
@@ -131,7 +141,16 @@ def io(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
             if not found:
                 iobytes += 0,
         if not all(b == 0 for b in iobytes):
-            splt2.plot_date(tstamps, iobytes,
+            # Downsample if needed
+            _frame = DataFrame(data=iobytes, index=tstamps, copy=False)
+            if len(tstamps) > plot.MAX_POINTS:
+                q = str(round(
+                    (tstamps[-1] - tstamps[0]).total_seconds()
+                    / plot.MAX_POINTS, 2))
+                r = _frame.resample(q + "s").mean()
+            else:
+                r = _frame
+            splt2.plot_date(r.index, r,
                             label=f"{iokind['object']}/"
                                   f"{iokind['backend_type']}/"
                                   f"{iokind['context']}",
@@ -143,15 +162,14 @@ def io(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     splt2.legend()
 
     fig.gca().yaxis.set_major_locator(MaxNLocator(integer=True))
-    outfile = f"""{outputdir.rstrip("/") + "/" if outputdir
+    outfile = f"""{
+        outputdir.rstrip("/") + "/" if outputdir
         else ''}pg_statviz_{info['hostname']
-        .replace("/", "-")}_{port}_io.png"""
+                            .replace("/", "-")}_{port}_io.png"""
     _logger.info(f"Saving {outfile}")
     plt.gcf().autofmt_xdate()
     fig.tight_layout()
     plt.savefig(outfile)
-
-    iorates = calc_iorates(data, iokinds, blcksz)
 
     # Plot I/O Rates
     plt, fig, splt1, splt2 = plot.setupdouble()
@@ -168,9 +186,20 @@ def io(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                       f"{iokind['context']}")
         if not all(numpy.isnan(v) or v == 0
                    for v in iorates['reads'][iokindname]):
-            splt1.plot_date(tstamps, [round(v / 1048576, 1 if v >= 100 else 2)
-                                      for v in iorates['writes'][iokindname]],
-                            label=iokindname, aa=True, linestyle='solid')
+            # Downsample if needed
+            _frame = DataFrame(
+                data=[round(v / 1048576, 1 if v >= 100 else 2)
+                      for v in iorates['reads'][iokindname]],
+                index=tstamps, copy=False)
+            if len(tstamps) > plot.MAX_POINTS:
+                q = str(round(
+                    (tstamps[-1] - tstamps[0]).total_seconds()
+                    / plot.MAX_POINTS, 2))
+                r = _frame.resample(q + "s").mean()
+            else:
+                r = _frame
+            splt1.plot_date(r.index, r, label=iokindname, aa=True,
+                            linestyle='solid')
     splt1.set_xlabel("Timestamp", fontweight='semibold')
     splt1.set_ylabel("Avg. read rate in MB/s", fontweight='semibold')
     splt1.set_ylim(bottom=0)
@@ -186,9 +215,20 @@ def io(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                       f"{iokind['context']}")
         if not all(numpy.isnan(v) or v == 0
                    for v in iorates['writes'][iokindname]):
-            splt2.plot_date(tstamps, [round(v / 1048576, 1 if v >= 100 else 2)
-                                      for v in iorates['writes'][iokindname]],
-                            label=iokindname, aa=True, linestyle='solid')
+            # Downsample if needed
+            _frame = DataFrame(
+                data=[round(v / 1048576, 1 if v >= 100 else 2)
+                      for v in iorates['writes'][iokindname]],
+                index=tstamps, copy=False)
+            if len(tstamps) > plot.MAX_POINTS:
+                q = str(round(
+                    (tstamps[-1] - tstamps[0]).total_seconds()
+                    / plot.MAX_POINTS, 2))
+                r = _frame.resample(q + "s").mean()
+            else:
+                r = _frame
+            splt2.plot_date(r.index, r, label=iokindname, aa=True,
+                            linestyle='solid')
     splt2.set_xlabel("Timestamp", fontweight='semibold')
     splt2.set_ylabel("Avg. write rate in MB/s", fontweight='semibold')
     splt2.legend()
@@ -196,11 +236,13 @@ def io(dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
 
     plt.gcf().autofmt_xdate()
     fig.tight_layout()
-    outfile = f"""{outputdir.rstrip("/") + "/" if outputdir
+    outfile = f"""{
+        outputdir.rstrip("/") + "/" if outputdir
         else ''}pg_statviz_{info['hostname']
-        .replace("/", "-")}_{port}_io_rate.png"""
+                            .replace("/", "-")}_{port}_io_rate.png"""
     _logger.info(f"Saving {outfile}")
     plt.savefig(outfile)
+    mpclose('all')
 
 
 # Gather I/O stats and convert to bytes

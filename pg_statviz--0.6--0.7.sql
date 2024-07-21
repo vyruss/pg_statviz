@@ -2,6 +2,174 @@
 // pg_statviz--0.6--0.7.sql - Upgrade extension to 0.7
 */
 
+-- Buffers and checkpoints
+
+-- PG17+ moved things out of pg_stat_bgwriter
+DO $block$
+BEGIN
+    IF (SELECT current_setting('server_version_num')::int >= 170000) THEN
+        CREATE OR REPLACE FUNCTION @extschema@.snapshot_buf(snapshot_tstamp timestamptz)
+        RETURNS void
+        AS $$
+            INSERT INTO @extschema@.buf (
+                snapshot_tstamp,
+                checkpoints_timed,
+                checkpoints_req,
+                checkpoint_write_time,
+                checkpoint_sync_time,
+                buffers_checkpoint,
+                buffers_clean,
+                maxwritten_clean,
+                buffers_backend,
+                buffers_backend_fsync,
+                buffers_alloc,
+                stats_reset)
+            SELECT
+                snapshot_tstamp,
+                c.num_timed,
+                c.num_requested,
+                c.write_time,
+                c.sync_time,
+                c.buffers_written,
+                b.buffers_clean,
+                b.maxwritten_clean,
+                i.writes,
+                i.fsyncs,
+                b.buffers_alloc,
+                b.stats_reset
+            FROM pg_stat_bgwriter b, pg_stat_checkpointer c, pg_stat_io i
+            WHERE i.backend_type = 'client backend'
+            AND i.context = 'normal'
+            AND i.object = 'relation';
+        $$ LANGUAGE SQL;
+    ELSE
+        CREATE OR REPLACE FUNCTION @extschema@.snapshot_buf(snapshot_tstamp timestamptz)
+        RETURNS void
+        AS $$
+            INSERT INTO @extschema@.buf (
+                snapshot_tstamp,
+                checkpoints_timed,
+                checkpoints_req,
+                checkpoint_write_time,
+                checkpoint_sync_time,
+                buffers_checkpoint,
+                buffers_clean,
+                maxwritten_clean,
+                buffers_backend,
+                buffers_backend_fsync,
+                buffers_alloc,
+                stats_reset)
+            SELECT
+                snapshot_tstamp,
+                checkpoints_timed,
+                checkpoints_req,
+                checkpoint_write_time,
+                checkpoint_sync_time,
+                buffers_checkpoint,
+                buffers_clean,
+                maxwritten_clean,
+                buffers_backend,
+                buffers_backend_fsync,
+                buffers_alloc,
+                stats_reset
+            FROM pg_stat_bgwriter;
+        $$ LANGUAGE SQL;
+    END IF;
+END
+$block$ LANGUAGE PLPGSQL;
+
+
+-- Configuration
+CREATE OR REPLACE FUNCTION @extschema@.snapshot_conf(snapshot_tstamp timestamptz)
+RETURNS void
+AS $$
+    INSERT INTO @extschema@.conf (
+        snapshot_tstamp,
+        conf)
+    SELECT
+        snapshot_tstamp,
+        jsonb_object_agg("variable", "value")
+    FROM (
+        SELECT "name" AS "variable",
+               "setting" AS "value"
+        FROM pg_settings
+        WHERE "name" IN (
+            'autovacuum',
+            'autovacuum_max_workers',
+            'autovacuum_naptime',
+            'autovacuum_work_mem',
+            'bgwriter_delay',
+            'bgwriter_lru_maxpages',
+            'bgwriter_lru_multiplier',
+            'checkpoint_completion_target',
+            'checkpoint_timeout',
+            'max_connections',
+            'max_wal_size',
+            'max_wal_senders',
+            'work_mem',
+            'maintenance_work_mem',
+            'max_replication_slots',
+            'max_parallel_workers',
+            'max_parallel_maintenance_workers',
+            'server_version_num',
+            'shared_buffers',
+            'vacuum_cost_delay',
+            'vacuum_cost_limit')) s;
+$$ LANGUAGE SQL;
+
+-- Convert existing data
+CREATE TABLE IF NOT EXISTS @extschema@._upgrade_conf(
+    snapshot_tstamp timestamptz REFERENCES @extschema@.snapshots(snapshot_tstamp) ON DELETE CASCADE PRIMARY KEY,
+    conf jsonb);
+
+INSERT INTO @extschema@._upgrade_conf
+SELECT snapshot_tstamp, jsonb_object_agg(j.x->>'setting', j.x->>'value')
+FROM (SELECT * FROM @extschema@.conf) s
+CROSS JOIN jsonb_array_elements(conf) AS j(x)
+GROUP BY snapshot_tstamp;
+
+DROP TABLE @extschema@.conf;
+ALTER TABLE @extschema@._upgrade_conf RENAME TO conf;
+
+
+-- Connections
+CREATE OR REPLACE FUNCTION @extschema@.snapshot_conn(snapshot_tstamp timestamptz)
+RETURNS void
+AS $$
+    WITH
+        pgsa AS (
+            SELECT *
+            FROM pg_stat_activity
+            WHERE datname = current_database()
+            AND state IS NOT NULL),
+        userconns AS (
+            SELECT jsonb_agg(uc)
+            FROM (
+                SELECT usename AS user, count(*) AS connections
+                FROM pgsa
+                WHERE usename IS NOT NULL
+                GROUP BY usename) uc)
+    INSERT INTO @extschema@.conn (
+        snapshot_tstamp,
+        conn_total,
+        conn_active,
+        conn_idle,
+        conn_idle_trans,
+        conn_idle_trans_abort,
+        conn_fastpath,
+        conn_users)
+    SELECT
+        snapshot_tstamp,
+        count(*) AS conn_total,
+        count(*) FILTER (WHERE state = 'active') AS conn_active,
+        count(*) FILTER (WHERE state = 'idle') AS conn_idle,
+        count(*) FILTER (WHERE state = 'idle in transaction') AS conn_idle_trans,
+        count(*) FILTER (WHERE state = 'idle in transaction (aborted)') AS conn_idle_trans_abort,
+        count(*) FILTER (WHERE state = 'fastpath function call') AS conn_fastpath,
+        (SELECT * from userconns) AS conn_users
+    FROM pgsa;
+$$ LANGUAGE SQL;
+
 -- pg_stat_wal only exists in PG14+
 DO $block$
 BEGIN
@@ -39,22 +207,9 @@ $block$ LANGUAGE PLPGSQL;
 
 
 -- DB
-CREATE TABLE IF NOT EXISTS @extschema@.db(
-    snapshot_tstamp timestamptz REFERENCES @extschema@.snapshots(snapshot_tstamp) ON DELETE CASCADE PRIMARY KEY,
-    xact_commit bigint,
-    xact_rollback bigint,
-    blks_read bigint,
-    blks_hit bigint,
-    tup_returned bigint,
-    tup_fetched bigint,
-    tup_inserted bigint,
-    tup_updated bigint,
-    tup_deleted bigint,
-    temp_files bigint,
-    temp_bytes bigint,
-    block_size int,
-    stats_reset timestamptz,
-    postmaster_start_time timestamptz);
+
+-- Added block_size
+ALTER TABLE @extschema@.db ADD IF NOT EXISTS block_size int;
 
 CREATE OR REPLACE FUNCTION @extschema@.snapshot_db(snapshot_tstamp timestamptz)
 RETURNS void
@@ -111,7 +266,7 @@ BEGIN
         AS $$
             WITH
                 pgsi AS (
-                    SELECT 
+                    SELECT
                         backend_type,
                         object,
                         context,
@@ -127,10 +282,11 @@ BEGIN
                         evictions,
                         reuses,
                         fsyncs,
-                        fsync_time
+                        fsync_time,
+                        stats_reset
                     FROM pg_stat_io
                     WHERE NOT (reads = 0 AND writes = 0)),
-                ioagg AS (       
+                ioagg AS (
                     SELECT jsonb_agg(io)
                     FROM (SELECT *
                           FROM pgsi) io)
@@ -138,9 +294,9 @@ BEGIN
                     snapshot_tstamp,
                     io_stats,
                     stats_reset)
-            SELECT snapshot_tstamp, 
+            SELECT snapshot_tstamp,
                    (SELECT * FROM ioagg) AS io_stats,
-                   (SELECT stats_reset FROM pgsi LIMIT 1) AS stats_reset;  
+                   (SELECT stats_reset FROM pgsi LIMIT 1) AS stats_reset;
         $$ LANGUAGE SQL;
     END IF;
 END
@@ -185,4 +341,14 @@ AS $$
 $$ LANGUAGE PLPGSQL;
 
 
+-- Make tables dumpable
 SELECT pg_catalog.pg_extension_config_dump('pgstatviz.io', '');
+
+
+-- Permissions
+GRANT USAGE ON SCHEMA @extschema@ TO pg_monitor;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA @extschema@ TO pg_monitor;
+GRANT SELECT ON ALL TABLES IN SCHEMA @extschema@ TO pg_monitor;
+GRANT INSERT ON ALL TABLES IN SCHEMA @extschema@ TO pg_monitor;
+GRANT DELETE ON ALL TABLES IN SCHEMA @extschema@ TO pg_monitor;
+GRANT TRUNCATE ON ALL TABLES IN SCHEMA @extschema@ TO pg_monitor;

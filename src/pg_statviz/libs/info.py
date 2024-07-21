@@ -7,7 +7,7 @@ __copyright__ = "Copyright (c) 2024 Jimmy Angelakos"
 __license__ = "PostgreSQL License"
 
 import logging
-from psycopg2.errors import ExternalRoutineException, InsufficientPrivilege
+from psycopg.errors import ExternalRoutineException, InsufficientPrivilege
 
 
 logging.basicConfig()
@@ -42,7 +42,7 @@ def getinfo(conn):
         cur.execute("""SELECT inet_server_addr(),
                               current_setting('block_size')""")
         info['inet_server_addr'], info['block_size'] = cur.fetchone()
-        info['hostname'] = conn.get_dsn_parameters()['host']
+        info['hostname'] = conn.info.host
         _logger.info(f"""Setting hostname to "{info['hostname']}" """)
         cur.close()
     return info

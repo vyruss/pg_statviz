@@ -1,7 +1,7 @@
 /*
 // pg_statviz - stats visualization and time series analysis
 //
-// Copyright (c) 2023 Jimmy Angelakos
+// Copyright (c) 2024 Jimmy Angelakos
 // This software is released under the PostgreSQL Licence
 //
 // pg_statviz--0.7 - Release v0.7
@@ -14,6 +14,96 @@
 CREATE TABLE IF NOT EXISTS @extschema@.snapshots(
     snapshot_tstamp timestamptz PRIMARY KEY
 );
+
+
+-- Buffers and checkpoints
+CREATE TABLE IF NOT EXISTS @extschema@.buf(
+    snapshot_tstamp timestamptz REFERENCES @extschema@.snapshots(snapshot_tstamp) ON DELETE CASCADE PRIMARY KEY,
+    checkpoints_timed bigint,
+    checkpoints_req bigint,
+    checkpoint_write_time double precision,
+    checkpoint_sync_time double precision,
+    buffers_checkpoint bigint,
+    buffers_clean bigint,
+    maxwritten_clean bigint,
+    buffers_backend bigint,
+    buffers_backend_fsync bigint,
+    buffers_alloc bigint,
+    stats_reset timestamptz);
+
+-- PG17+ moved things out of pg_stat_bgwriter
+DO $block$
+BEGIN
+    IF (SELECT current_setting('server_version_num')::int >= 170000) THEN
+        CREATE OR REPLACE FUNCTION @extschema@.snapshot_buf(snapshot_tstamp timestamptz)
+        RETURNS void
+        AS $$
+            INSERT INTO @extschema@.buf (
+                snapshot_tstamp,
+                checkpoints_timed,
+                checkpoints_req,
+                checkpoint_write_time,
+                checkpoint_sync_time,
+                buffers_checkpoint,
+                buffers_clean,
+                maxwritten_clean,
+                buffers_backend,
+                buffers_backend_fsync,
+                buffers_alloc,
+                stats_reset)
+            SELECT
+                snapshot_tstamp,
+                c.num_timed,
+                c.num_requested,
+                c.write_time,
+                c.sync_time,
+                c.buffers_written,
+                b.buffers_clean,
+                b.maxwritten_clean,
+                i.writes,
+                i.fsyncs,
+                b.buffers_alloc,
+                b.stats_reset
+            FROM pg_stat_bgwriter b, pg_stat_checkpointer c, pg_stat_io i
+            WHERE i.backend_type = 'client backend'
+            AND i.context = 'normal'
+            AND i.object = 'relation';
+        $$ LANGUAGE SQL;
+    ELSE
+        CREATE OR REPLACE FUNCTION @extschema@.snapshot_buf(snapshot_tstamp timestamptz)
+        RETURNS void
+        AS $$
+            INSERT INTO @extschema@.buf (
+                snapshot_tstamp,
+                checkpoints_timed,
+                checkpoints_req,
+                checkpoint_write_time,
+                checkpoint_sync_time,
+                buffers_checkpoint,
+                buffers_clean,
+                maxwritten_clean,
+                buffers_backend,
+                buffers_backend_fsync,
+                buffers_alloc,
+                stats_reset)
+            SELECT
+                snapshot_tstamp,
+                checkpoints_timed,
+                checkpoints_req,
+                checkpoint_write_time,
+                checkpoint_sync_time,
+                buffers_checkpoint,
+                buffers_clean,
+                maxwritten_clean,
+                buffers_backend,
+                buffers_backend_fsync,
+                buffers_alloc,
+                stats_reset
+            FROM pg_stat_bgwriter;
+        $$ LANGUAGE SQL;
+    END IF;
+END
+$block$ LANGUAGE PLPGSQL;
 
 
 -- Configuration
@@ -29,9 +119,9 @@ AS $$
         conf)
     SELECT
         snapshot_tstamp,
-        jsonb_agg(s)
+        jsonb_object_agg("variable", "value")
     FROM (
-        SELECT "name" AS "setting",
+        SELECT "name" AS "variable",
                "setting" AS "value"
         FROM pg_settings
         WHERE "name" IN (
@@ -56,54 +146,6 @@ AS $$
             'shared_buffers',
             'vacuum_cost_delay',
             'vacuum_cost_limit')) s;
-$$ LANGUAGE SQL;
-
-
--- Buffers
-CREATE TABLE IF NOT EXISTS @extschema@.buf(
-    snapshot_tstamp timestamptz REFERENCES @extschema@.snapshots(snapshot_tstamp) ON DELETE CASCADE PRIMARY KEY,
-    checkpoints_timed bigint,
-    checkpoints_req bigint,
-    checkpoint_write_time double precision,
-    checkpoint_sync_time double precision,
-    buffers_checkpoint bigint,
-    buffers_clean bigint,
-    maxwritten_clean bigint,
-    buffers_backend bigint,
-    buffers_backend_fsync bigint,
-    buffers_alloc bigint,
-    stats_reset timestamptz);
-
-CREATE OR REPLACE FUNCTION @extschema@.snapshot_buf(snapshot_tstamp timestamptz)
-RETURNS void
-AS $$
-    INSERT INTO @extschema@.buf (
-        snapshot_tstamp,
-        checkpoints_timed,
-        checkpoints_req,
-        checkpoint_write_time,
-        checkpoint_sync_time,
-        buffers_checkpoint,
-        buffers_clean,
-        maxwritten_clean,
-        buffers_backend,
-        buffers_backend_fsync,
-        buffers_alloc,
-        stats_reset)
-    SELECT
-        snapshot_tstamp,
-        checkpoints_timed,
-        checkpoints_req,
-        checkpoint_write_time,
-        checkpoint_sync_time,
-        buffers_checkpoint,
-        buffers_clean,
-        maxwritten_clean,
-        buffers_backend,
-        buffers_backend_fsync,
-        buffers_alloc,
-        stats_reset
-    FROM pg_stat_bgwriter;
 $$ LANGUAGE SQL;
 
 
@@ -132,6 +174,7 @@ AS $$
             FROM (
                 SELECT usename AS user, count(*) AS connections
                 FROM pgsa
+                WHERE usename IS NOT NULL
                 GROUP BY usename) uc)
     INSERT INTO @extschema@.conn (
         snapshot_tstamp,
@@ -346,7 +389,7 @@ BEGIN
         AS $$
             WITH
                 pgsi AS (
-                    SELECT 
+                    SELECT
                         backend_type,
                         object,
                         context,
@@ -362,10 +405,11 @@ BEGIN
                         evictions,
                         reuses,
                         fsyncs,
-                        fsync_time
+                        fsync_time,
+                        stats_reset
                     FROM pg_stat_io
                     WHERE NOT (reads = 0 AND writes = 0)),
-                ioagg AS (       
+                ioagg AS (
                     SELECT jsonb_agg(io)
                     FROM (SELECT *
                           FROM pgsi) io)
@@ -373,9 +417,9 @@ BEGIN
                     snapshot_tstamp,
                     io_stats,
                     stats_reset)
-            SELECT snapshot_tstamp, 
+            SELECT snapshot_tstamp,
                    (SELECT * FROM ioagg) AS io_stats,
-                   (SELECT stats_reset FROM pgsi LIMIT 1) AS stats_reset;  
+                   (SELECT stats_reset FROM pgsi LIMIT 1) AS stats_reset;
         $$ LANGUAGE SQL;
     END IF;
 END
