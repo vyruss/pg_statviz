@@ -16,49 +16,6 @@ CREATE TABLE IF NOT EXISTS @extschema@.snapshots(
 );
 
 
--- Configuration
-CREATE TABLE IF NOT EXISTS @extschema@.conf(
-    snapshot_tstamp timestamptz REFERENCES @extschema@.snapshots(snapshot_tstamp) ON DELETE CASCADE PRIMARY KEY,
-    conf jsonb);
-
-CREATE OR REPLACE FUNCTION @extschema@.snapshot_conf(snapshot_tstamp timestamptz)
-RETURNS void
-AS $$
-    INSERT INTO @extschema@.conf (
-        snapshot_tstamp,
-        conf)
-    SELECT
-        snapshot_tstamp,
-        jsonb_object_agg("variable", "value")
-    FROM (
-        SELECT "name" AS "variable",
-               "setting" AS "value"
-        FROM pg_settings
-        WHERE "name" IN (
-            'autovacuum',
-            'autovacuum_max_workers',
-            'autovacuum_naptime',
-            'autovacuum_work_mem',
-            'bgwriter_delay',
-            'bgwriter_lru_maxpages',
-            'bgwriter_lru_multiplier',
-            'checkpoint_completion_target',
-            'checkpoint_timeout',
-            'max_connections',
-            'max_wal_size',
-            'max_wal_senders',
-            'work_mem',
-            'maintenance_work_mem',
-            'max_replication_slots',
-            'max_parallel_workers',
-            'max_parallel_maintenance_workers',
-            'server_version_num',
-            'shared_buffers',
-            'vacuum_cost_delay',
-            'vacuum_cost_limit')) s;
-$$ LANGUAGE SQL;
-
-
 -- Buffers and checkpoints
 CREATE TABLE IF NOT EXISTS @extschema@.buf(
     snapshot_tstamp timestamptz REFERENCES @extschema@.snapshots(snapshot_tstamp) ON DELETE CASCADE PRIMARY KEY,
@@ -149,6 +106,49 @@ END
 $block$ LANGUAGE PLPGSQL;
 
 
+-- Configuration
+CREATE TABLE IF NOT EXISTS @extschema@.conf(
+    snapshot_tstamp timestamptz REFERENCES @extschema@.snapshots(snapshot_tstamp) ON DELETE CASCADE PRIMARY KEY,
+    conf jsonb);
+
+CREATE OR REPLACE FUNCTION @extschema@.snapshot_conf(snapshot_tstamp timestamptz)
+RETURNS void
+AS $$
+    INSERT INTO @extschema@.conf (
+        snapshot_tstamp,
+        conf)
+    SELECT
+        snapshot_tstamp,
+        jsonb_object_agg("variable", "value")
+    FROM (
+        SELECT "name" AS "variable",
+               "setting" AS "value"
+        FROM pg_settings
+        WHERE "name" IN (
+            'autovacuum',
+            'autovacuum_max_workers',
+            'autovacuum_naptime',
+            'autovacuum_work_mem',
+            'bgwriter_delay',
+            'bgwriter_lru_maxpages',
+            'bgwriter_lru_multiplier',
+            'checkpoint_completion_target',
+            'checkpoint_timeout',
+            'max_connections',
+            'max_wal_size',
+            'max_wal_senders',
+            'work_mem',
+            'maintenance_work_mem',
+            'max_replication_slots',
+            'max_parallel_workers',
+            'max_parallel_maintenance_workers',
+            'server_version_num',
+            'shared_buffers',
+            'vacuum_cost_delay',
+            'vacuum_cost_limit')) s;
+$$ LANGUAGE SQL;
+
+
 -- Connections
 CREATE TABLE IF NOT EXISTS @extschema@.conn(
     snapshot_tstamp timestamptz REFERENCES @extschema@.snapshots(snapshot_tstamp) ON DELETE CASCADE PRIMARY KEY,
@@ -174,6 +174,7 @@ AS $$
             FROM (
                 SELECT usename AS user, count(*) AS connections
                 FROM pgsa
+                WHERE usename IS NOT NULL
                 GROUP BY usename) uc)
     INSERT INTO @extschema@.conn (
         snapshot_tstamp,
