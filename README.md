@@ -15,7 +15,7 @@ Designed with the [K.I.S.S.](https://en.wikipedia.org/wiki/KISS_principle) and
 a modular, minimal and unobtrusive tool that does only what it's meant for: create snapshots
 of PostgreSQL statistics for visualization and analysis. To this end, a utility is provided for
 retrieving the stored snapshots and creating with them simple visualizations using
-[Matplotlib](https://github.com/matplotlib/matplotlib).
+[pandas](https://pandas.pydata.org/) and [Matplotlib](https://github.com/matplotlib/matplotlib).
 
 ## Installing the extension
 
@@ -42,7 +42,7 @@ To install from PGXN, either download the zip file and install manually or use t
 
 To install manually, clone this repository locally:
 
-    git clone https://github.com/vyruss/pg_statviz.git 
+    git clone https://github.com/vyruss/pg_statviz.git
 
 This will install the extension in the appropriate location for your system (`$SHAREDIR/extension`):
 
@@ -56,21 +56,21 @@ The extension can now be enabled inside the appropriate database like this, e.g.
     \c mydatabase
     CREATE EXTENSION pg_statviz;
 
-This will create the needed tables and functions under schema `pgstatviz` (note the lack of 
+This will create the needed tables and functions under schema `pgstatviz` (note the lack of
 underscore in the schema name).
 
 ## Installing the utility
 
-The visualization utility can also be installed from [PyPi](https://pypi.org/project/pg_statviz/):
+The visualization utility can be installed from [PyPi](https://pypi.org/project/pg_statviz/):
 
     pip install pg_statviz
 
-The utility is also available in the 
+The utility is also available in the
 [PostgreSQL Yum Repository](https://www.postgresql.org/download/linux/redhat/) and can be installed
 using `dnf` or `yum`:
 
     sudo dnf install pg_statviz
-    OR 
+    OR
     sudo yum install pg_statviz
 
 ### Requirements
@@ -90,11 +90,11 @@ a snapshot, e.g. from `psql`:
                snapshot
     -------------------------------
 
-     2023-01-27 11:04:58.055453+00
+     2024-06-27 11:04:58.055453+00
 
     (1 row)
 
-Older snapshots and their associated data can be removed using any time expression. For example, to 
+Older snapshots and their associated data can be removed using any time expression. For example, to
 remove data more than 90 days old:
 
     DELETE FROM pgstatviz.snapshots
@@ -107,15 +107,15 @@ Or all snapshots can be removed like this:
 [comment]::
 
     NOTICE:  truncating table "snapshots"
-    NOTICE:  truncate cascades to table "conf"
     NOTICE:  truncate cascades to table "buf"
-    NOTICE:  truncate cascades to table "conn"     
+    NOTICE:  truncate cascades to table "conf"
+    NOTICE:  truncate cascades to table "conn"
     NOTICE:  truncate cascades to table "lock"
-    NOTICE:  truncate cascades to table "wait"                
+    NOTICE:  truncate cascades to table "io"
+    NOTICE:  truncate cascades to table "wait"
     NOTICE:  truncate cascades to table "wal"
     NOTICE:  truncate cascades to table "db"
-    NOTICE:  truncate cascades to table "io"
-     delete_snapshots 
+     delete_snapshots
     ------------------
 
     (1 row)
@@ -136,15 +136,18 @@ Inside the `postgres` user's crontab, add this line to take a snapshot every 15 
 
 ## Visualization
 
+Potentially very large numbers of data points can be visualized with the aid of pandas resampling,
+displaying the mean value over 100 plot points as a default.
+
 The visualization utility can be called like a PostgreSQL command line tool:
 
     pg_statviz --help
 
 [comment]::
 
-    usage: pg_statviz [--help] [--version] [-d DBNAME] [-h HOSTNAME] [-p PORT] [-U USERNAME]
-                      [-W] [-D FROM TO] [-O OUTPUTDIR]
-                      {analyze,buf,cache,checkp,conn,io,lock,tuple,wait,wal,xact} ...
+    usage: pg_statviz [--help] [--version] [--dbname DBNAME] [-h HOSTNAME] [--port PORT]
+                      [-u USERNAME] [--password] [--daterange FROM TO] [-o OUTPUTDIR]
+                      {analyze,buf,cache,checkp,conn, io,lock,tuple,wait,wal,xact} ...
 
     run all analysis modules
 
@@ -174,7 +177,8 @@ The visualization utility can be called like a PostgreSQL command line tool:
                             database user name (default: 'myuser')
       -W, --password        force password prompt (should happen automatically) (default: False)
       -D FROM TO, --daterange FROM TO
-                            date range to be analyzed in ISO 8601 format e.g. 2023-01-01T00:002023-01-01T23:59 (default: [])
+                            date range to be analyzed in ISO 8601 format e.g. 2024-01-01T00:00
+                            2024-01-01T23:59 (default: [])
       -O OUTPUTDIR, --outputdir OUTPUTDIR
                             output directory (default: -)
 
@@ -186,9 +190,9 @@ The visualization utility can be called like a PostgreSQL command line tool:
 
     usage: pg_statviz conn [-h] [-d DBNAME] [--host HOSTNAME] [-p PORT] [-U USERNAME] [-W]
                            [-D FROM TO] [-O OUTPUTDIR] [-u [USERS ...]]
-    
+
     run connection count analysis module
-    
+
     options:
       -h, --help            show this help message and exit
       -d DBNAME, --dbname DBNAME
@@ -199,8 +203,8 @@ The visualization utility can be called like a PostgreSQL command line tool:
                             database user name (default: 'myuser')
       -W, --password        force password prompt (should happen automatically) (default: False)
       -D FROM TO, --daterange FROM TO
-                            date range to be analyzed in ISO 8601 format e.g. 2023-01-01T00:00
-                            2023-01-01T23:59 (default: [])
+                            date range to be analyzed in ISO 8601 format e.g. 2024-01-01T00:00
+                            2024-01-01T23:59 (default: [])
       -O OUTPUTDIR, --outputdir OUTPUTDIR
                             output directory (default: -)
       -u [USERS ...], --users [USERS ...]
@@ -208,7 +212,7 @@ The visualization utility can be called like a PostgreSQL command line tool:
 
 ### Example:
 
-    pg_statviz buf --host localhost -d postgres -U postgres -D 2023-01-24T23:00 2023-01-26
+    pg_statviz buf --host localhost -d postgres -U postgres -D 2024-06-24T23:00 2024-06-26
 
 ### Produces:
 ![buf output sample](src/pg_statviz/libs/pg_statviz_localhost_5432_buf.png)
@@ -231,25 +235,25 @@ Table | Description
 `pgstatviz.db` | PostgreSQL server and database statistics
 `pgstatviz.io` | I/O stats data
 `pgstatviz.lock` | Locks data
-`pgstatviz.wait` | Wait events data 
+`pgstatviz.wait` | Wait events data
 `pgstatviz.wal` | WAL generation data
 
 ## Export data
 
 To dump the captured data, e.g. for analysis on a different machine, run:
 
-    pg_dump -a -O -t pgstatviz.* > pg_statviz_data.dump
-    
+    pg_dump -d <dbname> -a -O -t pgstatviz.* > pg_statviz_data.dump
+
 Load it like this on the target database (which should have `pg_statviz` installed) :
 
-    psql -f pg_statviz_data.dump -d <dbname>
+    psql -d <other_dbname> -f pg_statviz_data.dump
 
-Alternatively, `pg_statviz` internal tables can also be exported to a tab separated values (TSV) file 
+Alternatively, `pg_statviz` internal tables can also be exported to a tab separated values (TSV) file
 for use by other tools:
 
-    psql -c "COPY pgstatviz.conn TO STDOUT CSV HEADER DELIMITER E'\t'" > conn.tsv
-    
-These can be loaded into another database like this (provided the tables exist):
+    psql -d <dbname> -c "COPY pgstatviz.conn TO STDOUT CSV HEADER DELIMITER E'\t'" > conn.tsv
 
-    psql -c "COPY pgstatviz.conn FROM STDIN CSV HEADER DELIMITER E'\t'" -d <dbname> < conn.tsv
+These can then be loaded into another database like this, provided the tables exist (installing the extension will create them):
+
+    psql -d <other_dbname> -c "COPY pgstatviz.conn FROM STDIN CSV HEADER DELIMITER E'\t'" < conn.tsv
 
