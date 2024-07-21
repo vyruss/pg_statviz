@@ -10,7 +10,7 @@ authors = [{name = "Jimmy Angelakos", email = "vyruss@hellug.gr"}]
 classifiers = ["Development Status :: 4 - Beta",
                "License :: OSI Approved :: PostgreSQL License",
                "Programming Language :: Python :: 3",]
-dependencies = ["argh", "contourpy", "cycler", "fonttools", "kiwisolver", "matplotlib", "numpy", "packaging", "Pillow", "psycopg2", "pyparsing", "python-dateutil", "six"]
+dependencies = ["argh", "contourpy", "cycler", "fonttools", "kiwisolver", "matplotlib", "numpy", "packaging", "pandas", "Pillow", "psycopg", "pyparsing", "python-dateutil", "six"]
 
 [project.urls]
 "Homepage" = "https://github.com/vyruss/pg_statviz"

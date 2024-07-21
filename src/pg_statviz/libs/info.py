@@ -8,6 +8,7 @@ __license__ = "PostgreSQL License"
 
 import logging
 from psycopg.errors import ExternalRoutineException, InsufficientPrivilege
+from psycopg.rows import dict_row
 
 
 logging.basicConfig()
@@ -31,7 +32,7 @@ def getinfo(conn):
                        FROM PROGRAM 'hostname'""")
         cur.execute("""SELECT hostname
                        FROM _info""")
-        info['hostname'] = cur.fetchone()
+        info['hostname'] = cur.fetchone()['hostname']
         cur.close()
     except (ExternalRoutineException, InsufficientPrivilege) as e:
         conn.rollback()
