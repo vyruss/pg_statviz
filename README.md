@@ -3,10 +3,10 @@
 `pg_statviz` is a minimalist extension and utility pair for time series analysis and visualization
 of PostgreSQL internal statistics.
 
-Created for snapshotting PostgreSQL's cumulative and dynamic statistics and performing time series
-analysis on them. The accompanying utility can produce visualizations for selected time ranges on
-the stored stats snapshots, enabling the user to track PostgreSQL performance over time and
-potentially perform tuning or troubleshooting.
+Created for capturing PostgreSQL's cumulative and dynamic statistics, `pg_statviz` enables deeper
+time series analysis than the standard PostgreSQL statistics views. The included utility generates
+visualizations for selected time ranges from the stored statistic snapshots, helping users track
+PostgreSQL performance over time and potentially aiding in performance tuning and troubleshooting.
 
 ## Design Philosophy
 
@@ -14,7 +14,7 @@ Designed with the [K.I.S.S.](https://en.wikipedia.org/wiki/KISS_principle) and
 [UNIX](https://en.wikipedia.org/wiki/Unix_philosophy) philosophies in mind, `pg_statviz` aims to be
 a modular, minimal and unobtrusive tool that does only what it's meant for: create snapshots
 of PostgreSQL statistics for visualization and analysis. To this end, a utility is provided for
-retrieving the stored snapshots and creating with them simple visualizations using
+retrieving and creating simple visualizations with the stored snapshots, by using
 [pandas](https://pandas.pydata.org/) and [Matplotlib](https://github.com/matplotlib/matplotlib).
 
 ## Installing the extension
@@ -79,7 +79,7 @@ Python 3.9+ is required for the visualization utility.
 
 ## Usage
 
-The extension can be used by superusers, or any user that has `pg_monitor` role privileges. To take
+The extension can be used by superusers or any user that has `pg_monitor` role privileges. To take
 a snapshot, e.g. from `psql`:
 
     SELECT pgstatviz.snapshot();
