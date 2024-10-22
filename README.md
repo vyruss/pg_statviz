@@ -19,6 +19,15 @@ retrieving and creating simple visualizations with the stored snapshots, by usin
 
 ## Installing the extension
 
+### Debian (12+) / Ubuntu (22.04+)
+
+1. Configure the PostgreSQL Deb repository for your Linux distribution, as
+[explained here for Debian](https://www.postgresql.org/download/linux/debian/) and
+[here for Ubuntu](https://www.postgresql.org/download/linux/ubuntu/).
+2. Use `apt` to install the extension for your PostgreSQL version:
+
+        sudo apt install postgresql-<pg_version>-statviz        
+
 ### Red Hat Enterprise Linux (v8.0+) / Fedora (37+)
 
 1. Configure the PostgreSQL Yum repository for your Linux distribution, as
@@ -65,7 +74,13 @@ The visualization utility can be installed from [PyPi](https://pypi.org/project/
 
     pip install pg_statviz
 
-The utility is also available in the
+The utility is also available in the [Debian](https://www.postgresql.org/download/linux/debian/) and
+[Ubuntu](https://www.postgresql.org/download/linux/ubuntu/) PostgreSQL Deb Repositories, and can be installed
+using `apt`:
+
+    sudo apt install pg-statviz
+
+Finally, it can be found in the
 [PostgreSQL Yum Repository](https://www.postgresql.org/download/linux/redhat/) and can be installed
 using `dnf` or `yum`:
 
@@ -76,6 +91,7 @@ using `dnf` or `yum`:
 ### Requirements
 
 Python 3.9+ is required for the visualization utility.
+Any recent PostgreSQL version up to and including 17 is supported.
 
 ## Usage
 
