@@ -105,9 +105,7 @@ a snapshot, e.g. from `psql`:
     NOTICE:  created pg_statviz snapshot
                snapshot
     -------------------------------
-
      2024-06-27 11:04:58.055453+00
-
     (1 row)
 
 Older snapshots and their associated data can be removed using any time expression. For example, to
