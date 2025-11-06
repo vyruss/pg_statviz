@@ -4,9 +4,9 @@ pg_statviz - stats visualization and time series analysis
 """
 
 __author__ = "Jimmy Angelakos"
-__copyright__ = "Copyright (c) 2024 Jimmy Angelakos"
+__copyright__ = "Copyright (c) 2025 Jimmy Angelakos"
 __license__ = "PostgreSQL License"
-__version__ = "0.7"
+__version__ = "0.8"
 
 import sys
 from argh import ArghParser
@@ -24,8 +24,8 @@ from pg_statviz.modules.xact import xact
 
 
 # Python version check
-if sys.version_info < (3, 9):
-    raise SystemExit("This program requires Python 3.9 or later")
+if sys.version_info < (3, 11):
+    raise SystemExit("This program requires Python 3.11 or later")
 
 
 def main():
