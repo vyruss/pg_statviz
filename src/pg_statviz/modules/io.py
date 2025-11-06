@@ -251,12 +251,25 @@ def calc_iostats(data, blcksz=8192):
     iokinds = []
     for snapshot in iostats:
         for entry in snapshot:
-            r = entry['reads']
-            if r:
-                entry['reads'] = int(r) * blcksz
-            w = entry['writes']
-            if w:
-                entry['writes'] = int(w) * blcksz
+            # PG18+ has read_bytes/write_bytes columns, older versions need conversion
+            if 'read_bytes' in entry:
+                r = entry['read_bytes']
+                if r:
+                    entry['reads'] = int(r)
+            else:
+                r = entry['reads']
+                if r:
+                    entry['reads'] = int(r) * blcksz
+
+            if 'write_bytes' in entry:
+                w = entry['write_bytes']
+                if w:
+                    entry['writes'] = int(w)
+            else:
+                w = entry['writes']
+                if w:
+                    entry['writes'] = int(w) * blcksz
+
             iokind = {'backend_type': entry['backend_type'],
                       'object': entry['object'],
                       'context': entry['context']}
@@ -280,16 +293,28 @@ def calc_iorates(data, iokinds, blcksz=8192):
                          - data[i]['snapshot_tstamp'])
                          .total_seconds())
                     v1, v2 = 0, 0
+                    # PG18+ has read_bytes/write_bytes columns
+                    rw_bytes = f"{rw[:-1]}_bytes"  # reads->read_bytes, writes->write_bytes
                     for entry in data[i]['io_stats']:
                         if {'backend_type': entry['backend_type'],
                                 'object': entry['object'],
                                 'context': entry['context']} == iokind:
-                            v1 = entry[rw]
+                            if rw_bytes in entry:
+                                v1 = entry[rw_bytes]
+                            elif rw in entry:
+                                v1 = entry[rw]
+                                if v1:
+                                    v1 = int(v1) * blcksz
                     for entry in data[i + 1]['io_stats']:
                         if {'backend_type': entry['backend_type'],
                                 'object': entry['object'],
                                 'context': entry['context']} == iokind:
-                            v2 = entry[rw]
+                            if rw_bytes in entry:
+                                v2 = entry[rw_bytes]
+                            elif rw in entry:
+                                v2 = entry[rw]
+                                if v2:
+                                    v2 = int(v2) * blcksz
                     yield (v2 - v1) / s if v1 else numpy.nan
                 else:
                     yield numpy.nan
