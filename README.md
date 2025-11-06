@@ -91,7 +91,7 @@ using `dnf` or `yum`:
 ### Requirements
 
 Python 3.9+ is required for the visualization utility.
-Any recent PostgreSQL version up to and including 17 is supported.
+Any recent PostgreSQL version up to and including 18 is supported.
 
 ## Usage
 
