@@ -64,7 +64,8 @@ def conn(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     cur = conn.cursor()
     cur.execute("""SELECT conn_total, conn_active, conn_idle, conn_idle_trans,
                           conn_idle_trans_abort, conn_fastpath, conn_users,
-                          snapshot_tstamp
+                          max_query_age_seconds, max_xact_age_seconds,
+                          max_backend_age_seconds, snapshot_tstamp
                    FROM pgstatviz.conn
                    WHERE snapshot_tstamp BETWEEN %s AND %s
                    ORDER BY snapshot_tstamp""",
@@ -80,6 +81,12 @@ def conn(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     cit = [c['conn_idle_trans'] for c in data]
     cita = [c['conn_idle_trans_abort'] for c in data]
     cf = [c['conn_fastpath'] for c in data]
+    max_query_age = [c['max_query_age_seconds'] if c['max_query_age_seconds'] is not None
+                     else 0 for c in data]
+    max_xact_age = [c['max_xact_age_seconds'] if c['max_xact_age_seconds'] is not None
+                    else 0 for c in data]
+    max_backend_age = [c['max_backend_age_seconds'] if c['max_backend_age_seconds'] is not None
+                       else 0 for c in data]
 
     # Downsample if needed
     conn_frame = DataFrame(
@@ -179,6 +186,44 @@ def conn(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
         outputdir.rstrip("/") + "/" if outputdir
         else ''}pg_statviz_{info['hostname']
                             .replace("/", "-")}_{port}_conn_user.png"""
+    _logger.info(f"Saving {outfile}")
+    plt.savefig(outfile)
+
+    # Session activity age plot
+    plt, fig = plot.setup()
+    plt.suptitle(f"pg_statviz · {info['hostname']}:{port}",
+                 fontweight='semibold')
+    plt.title('Session activity age')
+    # Downsample if needed
+    age_frame = DataFrame(
+        data={'max_query_age': max_query_age,
+              'max_xact_age': max_xact_age,
+              'max_backend_age': max_backend_age},
+        index=tstamps, copy=False)
+    if len(tstamps) > plot.MAX_POINTS:
+        q = str(round(
+            (tstamps[-1] - tstamps[0]).total_seconds() / plot.MAX_POINTS, 2))
+        ra = age_frame.resample(q + "s").max()
+    else:
+        ra = age_frame
+    if not all(c == 0 for c in ra['max_query_age']):
+        plt.plot_date(ra.index, ra['max_query_age'],
+                      label='max query age', aa=True, linestyle='solid')
+    if not all(c == 0 for c in ra['max_xact_age']):
+        plt.plot_date(ra.index, ra['max_xact_age'],
+                      label='max transaction age', aa=True, linestyle='solid')
+    if not all(c == 0 for c in ra['max_backend_age']):
+        plt.plot_date(ra.index, ra['max_backend_age'],
+                      label='max backend age', aa=True, linestyle='solid')
+    plt.xlabel("Timestamp", fontweight='semibold')
+    plt.ylabel("Age (seconds)", fontweight='semibold')
+    fig.axes[0].set_ylim(bottom=0)
+    fig.legend()
+    fig.tight_layout()
+    outfile = f"""{
+        outputdir.rstrip("/") + "/" if outputdir
+        else ''}pg_statviz_{info['hostname']
+                            .replace("/", "-")}_{port}_conn_age.png"""
     _logger.info(f"Saving {outfile}")
     plt.savefig(outfile)
     mpclose('all')

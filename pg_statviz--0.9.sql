@@ -158,7 +158,10 @@ CREATE TABLE IF NOT EXISTS @extschema@.conn(
     conn_idle_trans int,
     conn_idle_trans_abort int,
     conn_fastpath int,
-    conn_users jsonb);
+    conn_users jsonb,
+    max_query_age_seconds double precision,
+    max_xact_age_seconds double precision,
+    max_backend_age_seconds double precision);
 
 CREATE OR REPLACE FUNCTION @extschema@.snapshot_conn(snapshot_tstamp timestamptz)
 RETURNS void
@@ -175,7 +178,14 @@ AS $$
                 SELECT usename AS user, count(*) AS connections
                 FROM pgsa
                 WHERE usename IS NOT NULL
-                GROUP BY usename) uc)
+                GROUP BY usename) uc),
+        maxages AS (
+            SELECT
+                date_part('epoch', max(clock_timestamp() - query_start)) AS max_query_age,
+                date_part('epoch', max(clock_timestamp() - xact_start)) AS max_xact_age,
+                date_part('epoch', max(clock_timestamp() - backend_start)) AS max_backend_age
+            FROM pgsa
+            WHERE state != 'idle')
     INSERT INTO @extschema@.conn (
         snapshot_tstamp,
         conn_total,
@@ -184,7 +194,10 @@ AS $$
         conn_idle_trans,
         conn_idle_trans_abort,
         conn_fastpath,
-        conn_users)
+        conn_users,
+        max_query_age_seconds,
+        max_xact_age_seconds,
+        max_backend_age_seconds)
     SELECT
         snapshot_tstamp,
         count(*) AS conn_total,
@@ -193,7 +206,10 @@ AS $$
         count(*) FILTER (WHERE state = 'idle in transaction') AS conn_idle_trans,
         count(*) FILTER (WHERE state = 'idle in transaction (aborted)') AS conn_idle_trans_abort,
         count(*) FILTER (WHERE state = 'fastpath function call') AS conn_fastpath,
-        (SELECT * from userconns) AS conn_users
+        (SELECT * from userconns) AS conn_users,
+        (SELECT max_query_age FROM maxages),
+        (SELECT max_xact_age FROM maxages),
+        (SELECT max_backend_age FROM maxages)
     FROM pgsa;
 $$ LANGUAGE SQL;
 
