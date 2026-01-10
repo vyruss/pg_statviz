@@ -18,6 +18,7 @@ from pg_statviz.modules.checksum import checksum
 from pg_statviz.modules.conn import conn
 from pg_statviz.modules.io import io
 from pg_statviz.modules.lock import lock
+from pg_statviz.modules.repl import repl
 from pg_statviz.modules.tuple import tuple
 from pg_statviz.modules.wait import wait
 from pg_statviz.modules.wal import wal
@@ -37,7 +38,7 @@ def main():
                    version=f"pg_statviz {__version__}")
 
     p.add_commands([analyze, buf, cache, checkp, checksum, conn, io, lock,
-                    tuple, wait, wal, xact])
+                    repl, tuple, wait, wal, xact])
     p.set_default_command(analyze)
     p.dispatch()
 

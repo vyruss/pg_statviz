@@ -105,3 +105,45 @@ AS $$
         (SELECT max_backend_age FROM maxages)
     FROM pgsa;
 $$ LANGUAGE SQL;
+
+-- Add replication stats
+CREATE TABLE IF NOT EXISTS @extschema@.repl(
+    snapshot_tstamp timestamptz REFERENCES @extschema@.snapshots(snapshot_tstamp) ON DELETE CASCADE PRIMARY KEY,
+    standby_lag jsonb,
+    slot_stats jsonb);
+
+CREATE OR REPLACE FUNCTION @extschema@.snapshot_repl(snapshot_tstamp timestamptz)
+RETURNS void
+AS $$
+    WITH
+        standbys AS (
+            SELECT jsonb_agg(jsonb_build_object(
+                'application_name', application_name,
+                'state', state,
+                'sync_state', sync_state,
+                'lag_bytes', pg_wal_lsn_diff(pg_current_wal_lsn(), sent_lsn),
+                'lag_seconds', date_part('epoch', clock_timestamp() - reply_time)
+            )) AS standby_lag
+            FROM pg_stat_replication),
+        slots AS (
+            SELECT jsonb_agg(jsonb_build_object(
+                'slot_name', slot_name,
+                'slot_type', slot_type,
+                'active', active,
+                'wal_bytes', CASE
+                    WHEN pg_is_in_recovery() THEN NULL
+                    ELSE pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)
+                END
+            )) AS slot_stats
+            FROM pg_replication_slots
+            WHERE slot_type = 'physical'
+               OR database = current_database())
+    INSERT INTO @extschema@.repl (
+        snapshot_tstamp,
+        standby_lag,
+        slot_stats)
+    SELECT
+        snapshot_tstamp,
+        (SELECT standby_lag FROM standbys),
+        (SELECT slot_stats FROM slots);
+$$ LANGUAGE SQL;
