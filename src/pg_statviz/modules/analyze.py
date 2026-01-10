@@ -16,6 +16,7 @@ from pg_statviz.modules.conn import conn
 from pg_statviz.modules.io import io
 from pg_statviz.modules.lock import lock
 from pg_statviz.modules.repl import repl
+from pg_statviz.modules.slru import slru
 from pg_statviz.modules.tuple import tuple
 from pg_statviz.modules.wait import wait
 from pg_statviz.modules.wal import wal
@@ -53,6 +54,7 @@ def analyze(*, dbname=getpass.getuser(), host="/var/run/postgresql",
     io(daterange=daterange, outputdir=outputdir, info=info, conn=connx)
     lock(daterange=daterange, outputdir=outputdir, info=info, conn=connx)
     repl(daterange=daterange, outputdir=outputdir, info=info, conn=connx)
+    slru(daterange=daterange, outputdir=outputdir, info=info, conn=connx)
     tuple(daterange=daterange, outputdir=outputdir, info=info, conn=connx)
     wait(daterange=daterange, outputdir=outputdir, info=info, conn=connx)
     wal(daterange=daterange, outputdir=outputdir, info=info, conn=connx)

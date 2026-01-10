@@ -147,3 +147,29 @@ AS $$
         (SELECT standby_lag FROM standbys),
         (SELECT slot_stats FROM slots);
 $$ LANGUAGE SQL;
+
+-- Add SLRU stats
+CREATE TABLE IF NOT EXISTS @extschema@.slru(
+    snapshot_tstamp timestamptz REFERENCES @extschema@.snapshots(snapshot_tstamp) ON DELETE CASCADE PRIMARY KEY,
+    slru_stats jsonb);
+
+CREATE OR REPLACE FUNCTION @extschema@.snapshot_slru(snapshot_tstamp timestamptz)
+RETURNS void
+AS $$
+    INSERT INTO @extschema@.slru (
+        snapshot_tstamp,
+        slru_stats)
+    SELECT
+        snapshot_tstamp,
+        jsonb_agg(jsonb_build_object(
+            'name', name,
+            'blks_zeroed', blks_zeroed,
+            'blks_hit', blks_hit,
+            'blks_read', blks_read,
+            'blks_written', blks_written,
+            'blks_exists', blks_exists,
+            'flushes', flushes,
+            'truncates', truncates
+        ))
+    FROM pg_stat_slru;
+$$ LANGUAGE SQL;
