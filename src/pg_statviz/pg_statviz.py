@@ -14,6 +14,7 @@ from pg_statviz.modules.analyze import analyze
 from pg_statviz.modules.buf import buf
 from pg_statviz.modules.cache import cache
 from pg_statviz.modules.checkp import checkp
+from pg_statviz.modules.checksum import checksum
 from pg_statviz.modules.conn import conn
 from pg_statviz.modules.io import io
 from pg_statviz.modules.lock import lock
@@ -35,8 +36,8 @@ def main():
     p.add_argument('--version', action='version',
                    version=f"pg_statviz {__version__}")
 
-    p.add_commands([analyze, buf, cache, checkp, conn, io, lock, tuple, wait,
-                    wal, xact])
+    p.add_commands([analyze, buf, cache, checkp, checksum, conn, io, lock,
+                    tuple, wait, wal, xact])
     p.set_default_command(analyze)
     p.dispatch()
 

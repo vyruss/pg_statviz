@@ -11,6 +11,7 @@ from argh.decorators import arg
 from pg_statviz.modules.buf import buf
 from pg_statviz.modules.cache import cache
 from pg_statviz.modules.checkp import checkp
+from pg_statviz.modules.checksum import checksum
 from pg_statviz.modules.conn import conn
 from pg_statviz.modules.io import io
 from pg_statviz.modules.lock import lock
@@ -46,6 +47,7 @@ def analyze(*, dbname=getpass.getuser(), host="/var/run/postgresql",
     buf(daterange=daterange, outputdir=outputdir, info=info, conn=connx)
     checkp(daterange=daterange, outputdir=outputdir, info=info, conn=connx)
     cache(daterange=daterange, outputdir=outputdir, info=info, conn=connx)
+    checksum(daterange=daterange, outputdir=outputdir, info=info, conn=connx)
     conn(daterange=daterange, outputdir=outputdir, info=info, conn=connx)
     io(daterange=daterange, outputdir=outputdir, info=info, conn=connx)
     lock(daterange=daterange, outputdir=outputdir, info=info, conn=connx)
