@@ -3,7 +3,7 @@ pg_statviz - stats visualization and time series analysis
 """
 
 __author__ = "Jimmy Angelakos"
-__copyright__ = "Copyright (c) 2025 Jimmy Angelakos"
+__copyright__ = "Copyright (c) 2026 Jimmy Angelakos"
 __license__ = "PostgreSQL License"
 
 import logging
@@ -32,14 +32,17 @@ def getinfo(conn):
                        FROM PROGRAM 'hostname'""")
         cur.execute("""SELECT hostname
                        FROM _info""")
-        info['hostname'] = cur.fetchone()['hostname']
+        hostname = cur.fetchone()['hostname']
+        info['hostname'] = hostname.decode() if isinstance(hostname, bytes) \
+            else hostname
         cur.close()
     except (ExternalRoutineException, InsufficientPrivilege) as e:
         conn.rollback()
         cur = conn.cursor()
         _logger.warning("Context: getting hostname")
         _logger.warning(e)
-        info['hostname'] = conn.info.host
+        host = conn.info.host
+        info['hostname'] = host.decode() if isinstance(host, bytes) else host
         _logger.info(f"""Setting hostname to "{info['hostname']}" """)
         cur.close()
     return info
