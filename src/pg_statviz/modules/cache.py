@@ -26,8 +26,8 @@ from pandas import DataFrame
 @arg('-W', '--password', action='store_true',
      help="force password prompt (should happen automatically)")
 @arg('-D', '--daterange', nargs=2, metavar=('FROM', 'TO'), type=str,
-     help="date range to be analyzed in ISO 8601 format e.g. 2023-01-01T00:00 "
-          + "2023-01-01T23:59")
+     help="date range to be analyzed in ISO 8601 format e.g. 2026-01-01T00:00 "
+          + "2026-01-01T23:59")
 @arg('-O', '--outputdir', help="output directory")
 @arg('--info', help=argparse.SUPPRESS)
 @arg('--conn', help=argparse.SUPPRESS)

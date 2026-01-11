@@ -8,7 +8,6 @@ __license__ = "PostgreSQL License"
 
 import logging
 from psycopg.errors import ExternalRoutineException, InsufficientPrivilege
-from psycopg.rows import dict_row
 
 
 logging.basicConfig()

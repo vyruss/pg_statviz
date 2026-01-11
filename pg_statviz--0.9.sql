@@ -611,6 +611,8 @@ AS $$
             PERFORM @extschema@.snapshot_io(ts);
         END IF;
         PERFORM @extschema@.snapshot_lock(ts);
+        PERFORM @extschema@.snapshot_repl(ts);
+        PERFORM @extschema@.snapshot_slru(ts);
         PERFORM @extschema@.snapshot_wait(ts);
         -- pg_stat_wal only exists in PG14+
         IF (SELECT current_setting('server_version_num')::int >= 140000) THEN
@@ -638,6 +640,8 @@ SELECT pg_catalog.pg_extension_config_dump('pgstatviz.conn', '');
 SELECT pg_catalog.pg_extension_config_dump('pgstatviz.db', '');
 SELECT pg_catalog.pg_extension_config_dump('pgstatviz.io', '');
 SELECT pg_catalog.pg_extension_config_dump('pgstatviz.lock', '');
+SELECT pg_catalog.pg_extension_config_dump('pgstatviz.repl', '');
+SELECT pg_catalog.pg_extension_config_dump('pgstatviz.slru', '');
 SELECT pg_catalog.pg_extension_config_dump('pgstatviz.snapshots', '');
 SELECT pg_catalog.pg_extension_config_dump('pgstatviz.wait', '');
 SELECT pg_catalog.pg_extension_config_dump('pgstatviz.wal', '');

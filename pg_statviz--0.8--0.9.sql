@@ -173,3 +173,37 @@ AS $$
         ))
     FROM pg_stat_slru;
 $$ LANGUAGE SQL;
+
+-- Update snapshot function
+CREATE OR REPLACE FUNCTION @extschema@.snapshot()
+RETURNS timestamptz
+AS $$
+    DECLARE ts timestamptz;
+    BEGIN
+        ts := clock_timestamp();
+        INSERT INTO @extschema@.snapshots
+        VALUES (ts);
+        PERFORM @extschema@.snapshot_buf(ts);
+        PERFORM @extschema@.snapshot_conf(ts);
+        PERFORM @extschema@.snapshot_conn(ts);
+        PERFORM @extschema@.snapshot_db(ts);
+        -- pg_stat_io only exists in PG16+
+        IF (SELECT current_setting('server_version_num')::int >= 160000) THEN
+            PERFORM @extschema@.snapshot_io(ts);
+        END IF;
+        PERFORM @extschema@.snapshot_lock(ts);
+        PERFORM @extschema@.snapshot_repl(ts);
+        PERFORM @extschema@.snapshot_slru(ts);
+        PERFORM @extschema@.snapshot_wait(ts);
+        -- pg_stat_wal only exists in PG14+
+        IF (SELECT current_setting('server_version_num')::int >= 140000) THEN
+            PERFORM @extschema@.snapshot_wal(ts);
+        END IF;
+        RAISE NOTICE 'created pg_statviz snapshot';
+        RETURN ts;
+    END
+$$ LANGUAGE PLPGSQL;
+
+-- Make new tables dumpable
+SELECT pg_catalog.pg_extension_config_dump('pgstatviz.repl', '');
+SELECT pg_catalog.pg_extension_config_dump('pgstatviz.slru', '');

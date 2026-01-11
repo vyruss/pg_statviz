@@ -66,7 +66,8 @@ def repl(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                 (daterange[0], daterange[1]))
     data = cur.fetchall()
     if not data:
-        raise SystemExit("No pg_statviz snapshots found in this database")
+        _logger.warning("No replication stats found, skipping")
+        return
 
     tstamps = [t['snapshot_tstamp'] for t in data]
     standby_lag = [s['standby_lag'] for s in data]

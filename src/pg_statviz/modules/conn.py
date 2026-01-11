@@ -27,8 +27,8 @@ from pg_statviz.libs.info import getinfo
 @arg('-W', '--password', action='store_true',
      help="force password prompt (should happen automatically)")
 @arg('-D', '--daterange', nargs=2, metavar=('FROM', 'TO'), type=str,
-     help="date range to be analyzed in ISO 8601 format e.g. 2023-01-01T00:00"
-          + " 2023-01-01T23:59")
+     help="date range to be analyzed in ISO 8601 format e.g. 2026-01-01T00:00"
+          + " 2026-01-01T23:59")
 @arg('-O', '--outputdir', help="output directory")
 @arg('--info', help=argparse.SUPPRESS)
 @arg('--conn', help=argparse.SUPPRESS)
@@ -81,12 +81,15 @@ def conn(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     cit = [c['conn_idle_trans'] for c in data]
     cita = [c['conn_idle_trans_abort'] for c in data]
     cf = [c['conn_fastpath'] for c in data]
-    max_query_age = [c['max_query_age_seconds'] if c['max_query_age_seconds'] is not None
-                     else 0 for c in data]
-    max_xact_age = [c['max_xact_age_seconds'] if c['max_xact_age_seconds'] is not None
-                    else 0 for c in data]
-    max_backend_age = [c['max_backend_age_seconds'] if c['max_backend_age_seconds'] is not None
-                       else 0 for c in data]
+    max_query_age = [c['max_query_age_seconds']
+                     if c['max_query_age_seconds'] is not None else 0
+                     for c in data]
+    max_xact_age = [c['max_xact_age_seconds']
+                    if c['max_xact_age_seconds'] is not None else 0
+                    for c in data]
+    max_backend_age = [c['max_backend_age_seconds']
+                       if c['max_backend_age_seconds'] is not None else 0
+                       for c in data]
 
     # Downsample if needed
     conn_frame = DataFrame(

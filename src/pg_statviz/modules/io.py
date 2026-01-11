@@ -28,8 +28,8 @@ from pg_statviz.libs.info import getinfo
 @arg('-W', '--password', action='store_true',
      help="force password prompt (should happen automatically)")
 @arg('-D', '--daterange', nargs=2, metavar=('FROM', 'TO'), type=str,
-     help="date range to be analyzed in ISO 8601 format e.g. 2023-01-01T00:00"
-          + " 2023-01-01T23:59")
+     help="date range to be analyzed in ISO 8601 format e.g. 2026-01-01T00:00"
+          + " 2026-01-01T23:59")
 @arg('-O', '--outputdir', help="output directory")
 @arg('--info', help=argparse.SUPPRESS)
 @arg('--conn', help=argparse.SUPPRESS)
@@ -251,7 +251,8 @@ def calc_iostats(data, blcksz=8192):
     iokinds = []
     for snapshot in iostats:
         for entry in snapshot:
-            # PG18+ has read_bytes/write_bytes columns, older versions need conversion
+            # PG18+ has read_bytes/write_bytes columns,
+            # older versions need conversion
             if 'read_bytes' in entry:
                 r = entry['read_bytes']
                 if r:
@@ -294,7 +295,7 @@ def calc_iorates(data, iokinds, blcksz=8192):
                          .total_seconds())
                     v1, v2 = 0, 0
                     # PG18+ has read_bytes/write_bytes columns
-                    rw_bytes = f"{rw[:-1]}_bytes"  # reads->read_bytes, writes->write_bytes
+                    rw_bytes = f"{rw[:-1]}_bytes"
                     for entry in data[i]['io_stats']:
                         if {'backend_type': entry['backend_type'],
                                 'object': entry['object'],

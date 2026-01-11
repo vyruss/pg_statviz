@@ -120,6 +120,11 @@ jobs:
             - name: Initialize PostgreSQL
               run: |
                   sudo -u postgres /usr/lib/postgresql/18/bin/initdb -D /tmp/pgdata
+                  cat >> /tmp/pgdata/postgresql.conf << 'EOF'
+                  wal_level = logical
+                  max_replication_slots = 4
+                  max_wal_senders = 4
+                  EOF
                   sudo -u postgres /usr/lib/postgresql/18/bin/pg_ctl -D /tmp/pgdata -l /tmp/postgres.log start
 
             - name: Wait for PostgreSQL
@@ -137,6 +142,14 @@ jobs:
               run: |
                   sudo -u postgres psql -c "CREATE DATABASE testdb;"
                   sudo -u postgres psql -d testdb -c "CREATE EXTENSION pg_statviz;"
+
+            - name: Setup logical replication
+              run: |
+                  sudo -u postgres psql -c "CREATE DATABASE dummydb;"
+                  sudo -u postgres psql -d testdb -c 'CREATE PUBLICATION dummy_pub FOR TABLES IN SCHEMA pgstatviz;'
+                  sudo -u postgres psql -d dummydb -c "CREATE EXTENSION pg_statviz;"
+                  sudo -u postgres psql -d testdb -c "SELECT pg_create_logical_replication_slot('dummy_sub', 'pgoutput');"
+                  sudo -u postgres psql -d dummydb -c "CREATE SUBSCRIPTION dummy_sub CONNECTION 'dbname=testdb host=localhost' PUBLICATION dummy_pub WITH (copy_data = false, origin = none, create_slot = false);"
 
             - name: Take snapshots
               run: |
