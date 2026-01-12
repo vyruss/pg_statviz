@@ -69,11 +69,12 @@ def wal(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     data = cur.fetchall()
     if not data:
         cur.execute("""SELECT
-                    (current_setting('server_version_num')::int >= 150000)""")
-        versioncheck = cur.fetchone()[0]
+                    (current_setting('server_version_num')::int >= 140000)
+                    AS version_ok""")
+        versioncheck = cur.fetchone()['version_ok']
         if not versioncheck:
-            _logger.error("WAL generation analysis is only available from "
-                          + "PostgreSQL release 15 onwards")
+            _logger.warning("WAL generation analysis is only available from "
+                            + "PostgreSQL release 14 onwards")
             return
         else:
             raise SystemExit("No pg_statviz snapshots found in this database")

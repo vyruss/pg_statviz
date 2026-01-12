@@ -70,7 +70,16 @@ def io(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
 
     data = cur.fetchall()
     if not data:
-        raise SystemExit("No pg_statviz snapshots found in this database")
+        cur.execute("""SELECT
+                    (current_setting('server_version_num')::int >= 160000)
+                    AS version_ok""")
+        versioncheck = cur.fetchone()['version_ok']
+        if not versioncheck:
+            _logger.warning("I/O analysis is only available from "
+                            + "PostgreSQL release 16 onwards")
+            return
+        else:
+            raise SystemExit("No pg_statviz snapshots found in this database")
 
     tstamps = [ts['snapshot_tstamp'] for ts in data]
     blcksz = int(data[0]['block_size'])

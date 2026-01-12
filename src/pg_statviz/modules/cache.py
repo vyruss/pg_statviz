@@ -106,4 +106,6 @@ def cache(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
 def calc_ratio(data):
     return [round((int(d['blks_hit'])
                    / (int(d['blks_read']) + int(d['blks_hit']))) * 100, 2)
+            if (int(d['blks_read']) + int(d['blks_hit'])) > 0
+            else 0.0
             for d in data]
