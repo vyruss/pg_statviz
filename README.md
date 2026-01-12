@@ -170,12 +170,13 @@ The visualization utility can be called like a PostgreSQL command line tool:
     run all analysis modules
 
     positional arguments:
-      {analyze,buf,cache,checkp,checksum,conn,io,lock,repl,slru,tuple,wait,wal,xact}
+      {analyze,buf,cache,checkp,checksum,conf,conn,io,lock,repl,slru,tuple,wait,wal,xact}
         analyze             run all analysis modules
         buf                 run buffers written analysis module
         cache               run cache hit ratio analysis module
         checkp              run checkpoint analysis module
         checksum            run checksum failure analysis module
+        conf                run configuration changes analysis module
         conn                run connection count analysis module
         io                  run I/O analysis module
         lock                run locks analysis module

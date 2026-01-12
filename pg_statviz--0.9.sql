@@ -147,9 +147,9 @@ BEGIN
             'vacuum_cost_delay',
             'vacuum_cost_limit')) s;
 
-    SELECT conf INTO previous_conf
-    FROM @extschema@.conf
-    WHERE snapshot_tstamp = (SELECT MAX(snapshot_tstamp) FROM @extschema@.conf);
+    SELECT c1.conf INTO previous_conf
+    FROM @extschema@.conf c1
+    WHERE c1.snapshot_tstamp = (SELECT MAX(c2.snapshot_tstamp) FROM @extschema@.conf c2);
 
     IF previous_conf IS NULL OR current_conf IS DISTINCT FROM previous_conf THEN
         INSERT INTO @extschema@.conf (snapshot_tstamp, conf)
