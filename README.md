@@ -1,3 +1,5 @@
+![pg_statviz](src/pg_statviz/libs/pg_statviz_readme.png)
+
 # pg_statviz
 
 `pg_statviz` is a minimalist extension and utility pair for time series analysis and visualization
@@ -105,7 +107,7 @@ a snapshot, e.g. from `psql`:
     NOTICE:  created pg_statviz snapshot
                snapshot
     -------------------------------
-     2024-06-27 11:04:58.055453+00
+     2026-01-01 11:04:58.055453+00
     (1 row)
 
 Older snapshots and their associated data can be removed using any time expression. For example, to
@@ -124,11 +126,13 @@ Or all snapshots can be removed like this:
     NOTICE:  truncate cascades to table "buf"
     NOTICE:  truncate cascades to table "conf"
     NOTICE:  truncate cascades to table "conn"
-    NOTICE:  truncate cascades to table "lock"
+    NOTICE:  truncate cascades to table "db"
     NOTICE:  truncate cascades to table "io"
+    NOTICE:  truncate cascades to table "lock"
+    NOTICE:  truncate cascades to table "repl"
+    NOTICE:  truncate cascades to table "slru"
     NOTICE:  truncate cascades to table "wait"
     NOTICE:  truncate cascades to table "wal"
-    NOTICE:  truncate cascades to table "db"
      delete_snapshots
     ------------------
 
@@ -159,21 +163,25 @@ The visualization utility can be called like a PostgreSQL command line tool:
 
 [comment]::
 
-    usage: pg_statviz [--help] [--version] [--dbname DBNAME] [-h HOSTNAME] [--port PORT]
-                      [-u USERNAME] [--password] [--daterange FROM TO] [-o OUTPUTDIR]
-                      {analyze,buf,cache,checkp,conn, io,lock,tuple,wait,wal,xact} ...
+    usage: pg_statviz [--help] [--version] [-d DBNAME] [-h HOSTNAME] [-p PORT]
+                      [-U USERNAME] [-W] [-D FROM TO] [-O OUTPUTDIR]
+                      {analyze,buf,cache,checkp,checksum,conn,io,lock,repl,slru,tuple,wait,wal,xact} ...
 
     run all analysis modules
 
     positional arguments:
-      {analyze,buf,cache,checkp,conn,io,lock,tuple,wait,wal,xact}
+      {analyze,buf,cache,checkp,checksum,conf,conn,io,lock,repl,slru,tuple,wait,wal,xact}
         analyze             run all analysis modules
         buf                 run buffers written analysis module
         cache               run cache hit ratio analysis module
         checkp              run checkpoint analysis module
+        checksum            run checksum failure analysis module
+        conf                run configuration changes analysis module
         conn                run connection count analysis module
         io                  run I/O analysis module
         lock                run locks analysis module
+        repl                run replication analysis module
+        slru                run SLRU analysis module
         tuple               run tuple count analysis module
         wait                run wait events analysis module
         wal                 run WAL generation analysis module
@@ -191,8 +199,8 @@ The visualization utility can be called like a PostgreSQL command line tool:
                             database user name (default: 'myuser')
       -W, --password        force password prompt (should happen automatically) (default: False)
       -D FROM TO, --daterange FROM TO
-                            date range to be analyzed in ISO 8601 format e.g. 2024-01-01T00:00
-                            2024-01-01T23:59 (default: [])
+                            date range to be analyzed in ISO 8601 format e.g. 2026-01-01T00:00
+                            2026-01-01T23:59 (default: [])
       -O OUTPUTDIR, --outputdir OUTPUTDIR
                             output directory (default: -)
 
@@ -217,8 +225,8 @@ The visualization utility can be called like a PostgreSQL command line tool:
                             database user name (default: 'myuser')
       -W, --password        force password prompt (should happen automatically) (default: False)
       -D FROM TO, --daterange FROM TO
-                            date range to be analyzed in ISO 8601 format e.g. 2024-01-01T00:00
-                            2024-01-01T23:59 (default: [])
+                            date range to be analyzed in ISO 8601 format e.g. 2026-01-01T00:00
+                            2026-01-01T23:59 (default: [])
       -O OUTPUTDIR, --outputdir OUTPUTDIR
                             output directory (default: -)
       -u [USERS ...], --users [USERS ...]
@@ -226,7 +234,7 @@ The visualization utility can be called like a PostgreSQL command line tool:
 
 ### Example:
 
-    pg_statviz buf --host localhost -d postgres -U postgres -D 2024-06-24T23:00 2024-06-26
+    pg_statviz buf --host localhost -d postgres -U postgres -D 2026-01-01T00:00 2026-01-01T23:59
 
 ### Produces:
 ![buf output sample](src/pg_statviz/libs/pg_statviz_localhost_5432_buf.png)
@@ -234,6 +242,8 @@ The visualization utility can be called like a PostgreSQL command line tool:
 [comment]::
 
 ![buf output sample (rate)](src/pg_statviz/libs/pg_statviz_localhost_5432_buf_rate.png)
+
+![conf output sample](src/pg_statviz/libs/pg_statviz_localhost_5432_conf.png)
 
 
 ## Schema
@@ -249,6 +259,8 @@ Table | Description
 `pgstatviz.db` | PostgreSQL server and database statistics
 `pgstatviz.io` | I/O stats data
 `pgstatviz.lock` | Locks data
+`pgstatviz.repl` | Replication stats data
+`pgstatviz.slru` | SLRU cache stats data
 `pgstatviz.wait` | Wait events data
 `pgstatviz.wal` | WAL generation data
 

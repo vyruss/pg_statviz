@@ -1,16 +1,15 @@
 [project]
 name = "pg_statviz"
-version = "0.8"
+version = "0.9"
 description = "A minimalist extension and utility pair for time series analysis and visualization of PostgreSQL internal statistics."
 readme = "README.md"
 requires-python = ">=3.11"
-license = {file = "LICENSE"}
+license = "PostgreSQL"
 keywords = ["open-source", "postgres", "opensource", "database", "dataviz", "time-series", "postgresql", "data-visualization", "database-management", "database-administration", "performance-analysis", "postgresql-database", "postgresql-extension", "time-series-analysis"]
 authors = [{name = "Jimmy Angelakos", email = "vyruss@hellug.gr"}]
 classifiers = ["Development Status :: 4 - Beta",
-               "License :: OSI Approved :: PostgreSQL License",
                "Programming Language :: Python :: 3",]
-dependencies = ["argh", "contourpy", "cycler", "fonttools", "kiwisolver", "matplotlib", "numpy", "packaging", "pandas", "Pillow", "psycopg", "pyparsing", "python-dateutil", "six"]
+dependencies = ["argh<0.30", "contourpy", "cycler", "fonttools", "kiwisolver", "matplotlib", "numpy", "packaging", "pandas", "Pillow", "psycopg", "pyparsing", "python-dateutil", "six"]
 
 [project.urls]
 "Homepage" = "https://github.com/vyruss/pg_statviz"

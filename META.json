@@ -2,7 +2,7 @@
    "name": "pg_statviz",
    "abstract": "PostgreSQL stats visualization over time",
    "description": "pg_statviz is a minimalist extension and utility pair for time series analysis and visualization of PostgreSQL internal statistics.",
-   "version": "0.7.0",
+   "version": "0.9.0",
    "release_status": "testing",
    "maintainer": "Jimmy Angelakos <vyruss@hellug.gr>",
    "license": {
@@ -12,18 +12,18 @@
       "runtime": {
          "requires": {
             "plpgsql": 0,
-            "PostgreSQL": "12.0.0"
+            "PostgreSQL": "13.0.0"
          },
          "recommends": {
-            "PostgreSQL": "16.0.0"
+            "PostgreSQL": "18.0.0"
          }
       }
    },
    "provides": {
      "pg_statviz": {
-       "file": "pg_statviz--0.7.sql",
+       "file": "pg_statviz--0.9.sql",
        "docfile": "README.md",
-       "version": "0.7.0",
+       "version": "0.9.0",
        "abstract": "PostgreSQL stats visualization over time"
      }
    },

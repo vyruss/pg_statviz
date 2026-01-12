@@ -3,7 +3,7 @@ pg_statviz - stats visualization and time series analysis
 """
 
 __author__ = "Jimmy Angelakos"
-__copyright__ = "Copyright (c) 2025 Jimmy Angelakos"
+__copyright__ = "Copyright (c) 2026 Jimmy Angelakos"
 __license__ = "PostgreSQL License"
 
 import argparse
@@ -28,8 +28,8 @@ from pg_statviz.libs.info import getinfo
 @arg('-W', '--password', action='store_true',
      help="force password prompt (should happen automatically)")
 @arg('-D', '--daterange', nargs=2, metavar=('FROM', 'TO'), type=str,
-     help="date range to be analyzed in ISO 8601 format e.g. 2023-01-01T00:00 "
-          + "2023-01-01T23:59")
+     help="date range to be analyzed in ISO 8601 format e.g. 2026-01-01T00:00 "
+          + "2026-01-01T23:59")
 @arg('-O', '--outputdir', help="output directory")
 @arg('--info', help=argparse.SUPPRESS)
 @arg('--conn', help=argparse.SUPPRESS)
@@ -69,11 +69,12 @@ def wal(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     data = cur.fetchall()
     if not data:
         cur.execute("""SELECT
-                    (current_setting('server_version_num')::int >= 150000)""")
-        versioncheck = cur.fetchone()[0]
+                    (current_setting('server_version_num')::int >= 140000)
+                    AS version_ok""")
+        versioncheck = cur.fetchone()['version_ok']
         if not versioncheck:
-            _logger.error("WAL generation analysis is only available from "
-                          + "PostgreSQL release 15 onwards")
+            _logger.warning("WAL generation analysis is only available from "
+                            + "PostgreSQL release 14 onwards")
             return
         else:
             raise SystemExit("No pg_statviz snapshots found in this database")
