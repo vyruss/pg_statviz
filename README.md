@@ -1,3 +1,5 @@
+![pg_statviz](src/pg_statviz/libs/pg_statviz_readme.png)
+
 # pg_statviz
 
 `pg_statviz` is a minimalist extension and utility pair for time series analysis and visualization
