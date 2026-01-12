@@ -112,7 +112,7 @@ def conf(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
         return
 
     # Plot configuration changes timeline
-    plt, _ = plot.setup()
+    plt, fig = plot.setup()
     plt.suptitle(f"pg_statviz · {info['hostname']}:{port}",
                  fontweight='semibold')
     plt.title("Configuration changes")
@@ -132,16 +132,15 @@ def conf(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
         plt.axvline(x=change['timestamp'], color=colors[i % len(colors)],
                     linestyle='--', linewidth=1.5, alpha=0.7, label=label)
 
+    plt.xlabel("Timestamp", fontweight='semibold')
     # Pad the x-axis
     plt.margins(x=0.05)
 
     # Hide y-axis
     plt.gca().get_yaxis().set_visible(False)
 
-    # Add legend
-    plt.legend()
-
-    plt.gcf().autofmt_xdate()
+    fig.legend()
+    fig.tight_layout()
     outfile = f"""{
         outputdir.rstrip("/") + "/" if outputdir
         else ''}pg_statviz_{info['hostname']

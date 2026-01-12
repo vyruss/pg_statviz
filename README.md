@@ -243,6 +243,8 @@ The visualization utility can be called like a PostgreSQL command line tool:
 
 ![buf output sample (rate)](src/pg_statviz/libs/pg_statviz_localhost_5432_buf_rate.png)
 
+![conf output sample](src/pg_statviz/libs/pg_statviz_localhost_5432_conf.png)
+
 
 ## Schema
 
