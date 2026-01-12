@@ -207,3 +207,68 @@ $$ LANGUAGE PLPGSQL;
 -- Make new tables dumpable
 SELECT pg_catalog.pg_extension_config_dump('pgstatviz.repl', '');
 SELECT pg_catalog.pg_extension_config_dump('pgstatviz.slru', '');
+
+-- Remove duplicate config snapshots (keep first and those where config changed)
+SELECT 'compacting conf table, this may take some time...' AS notice;
+
+DELETE FROM @extschema@.conf
+WHERE snapshot_tstamp NOT IN (
+    SELECT snapshot_tstamp
+    FROM (
+        SELECT snapshot_tstamp,
+               LAG(conf) OVER (ORDER BY snapshot_tstamp) AS prev_conf,
+               conf
+        FROM @extschema@.conf
+    ) t
+    WHERE prev_conf IS NULL
+       OR conf IS DISTINCT FROM prev_conf
+);
+SELECT 'done.' AS notice;
+
+-- Update snapshot_conf to only store when config changes
+CREATE OR REPLACE FUNCTION @extschema@.snapshot_conf(snapshot_tstamp timestamptz)
+RETURNS void
+AS $$
+DECLARE
+    current_conf jsonb;
+    previous_conf jsonb;
+BEGIN
+    SELECT jsonb_object_agg("variable", "value")
+    INTO current_conf
+    FROM (
+        SELECT "name" AS "variable",
+               "setting" AS "value"
+        FROM pg_settings
+        WHERE "name" IN (
+            'autovacuum',
+            'autovacuum_max_workers',
+            'autovacuum_naptime',
+            'autovacuum_work_mem',
+            'bgwriter_delay',
+            'bgwriter_lru_maxpages',
+            'bgwriter_lru_multiplier',
+            'checkpoint_completion_target',
+            'checkpoint_timeout',
+            'max_connections',
+            'max_wal_size',
+            'max_wal_senders',
+            'work_mem',
+            'maintenance_work_mem',
+            'max_replication_slots',
+            'max_parallel_workers',
+            'max_parallel_maintenance_workers',
+            'server_version_num',
+            'shared_buffers',
+            'vacuum_cost_delay',
+            'vacuum_cost_limit')) s;
+
+    SELECT conf INTO previous_conf
+    FROM @extschema@.conf
+    WHERE snapshot_tstamp = (SELECT MAX(snapshot_tstamp) FROM @extschema@.conf);
+
+    IF previous_conf IS NULL OR current_conf IS DISTINCT FROM previous_conf THEN
+        INSERT INTO @extschema@.conf (snapshot_tstamp, conf)
+        VALUES (snapshot_conf.snapshot_tstamp, current_conf);
+    END IF;
+END;
+$$ LANGUAGE plpgsql;

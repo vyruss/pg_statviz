@@ -114,12 +114,12 @@ CREATE TABLE IF NOT EXISTS @extschema@.conf(
 CREATE OR REPLACE FUNCTION @extschema@.snapshot_conf(snapshot_tstamp timestamptz)
 RETURNS void
 AS $$
-    INSERT INTO @extschema@.conf (
-        snapshot_tstamp,
-        conf)
-    SELECT
-        snapshot_tstamp,
-        jsonb_object_agg("variable", "value")
+DECLARE
+    current_conf jsonb;
+    previous_conf jsonb;
+BEGIN
+    SELECT jsonb_object_agg("variable", "value")
+    INTO current_conf
     FROM (
         SELECT "name" AS "variable",
                "setting" AS "value"
@@ -146,7 +146,17 @@ AS $$
             'shared_buffers',
             'vacuum_cost_delay',
             'vacuum_cost_limit')) s;
-$$ LANGUAGE SQL;
+
+    SELECT conf INTO previous_conf
+    FROM @extschema@.conf
+    WHERE snapshot_tstamp = (SELECT MAX(snapshot_tstamp) FROM @extschema@.conf);
+
+    IF previous_conf IS NULL OR current_conf IS DISTINCT FROM previous_conf THEN
+        INSERT INTO @extschema@.conf (snapshot_tstamp, conf)
+        VALUES (snapshot_conf.snapshot_tstamp, current_conf);
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
 
 
 -- Connections
