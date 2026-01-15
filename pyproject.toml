@@ -4,7 +4,7 @@ version = "0.9"
 description = "A minimalist extension and utility pair for time series analysis and visualization of PostgreSQL internal statistics."
 readme = "README.md"
 requires-python = ">=3.11"
-license = "PostgreSQL"
+license = {file = "LICENSE"}
 keywords = ["open-source", "postgres", "opensource", "database", "dataviz", "time-series", "postgresql", "data-visualization", "database-management", "database-administration", "performance-analysis", "postgresql-database", "postgresql-extension", "time-series-analysis"]
 authors = [{name = "Jimmy Angelakos", email = "vyruss@hellug.gr"}]
 classifiers = ["Development Status :: 4 - Beta",
