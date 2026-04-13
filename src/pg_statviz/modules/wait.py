@@ -15,7 +15,10 @@ from matplotlib.pyplot import close as mpclose
 from matplotlib.ticker import MaxNLocator
 from pandas import DataFrame
 from pg_statviz.libs import plot
+from pg_statviz.libs.ai import (AI_PROVIDERS, DEFAULT_AI_PROVIDER,
+                                run_chart_analysis)
 from pg_statviz.libs.dbconn import dbconn
+from pg_statviz.libs.html_report import finalize_module_report
 from pg_statviz.libs.info import getinfo
 
 
@@ -30,11 +33,16 @@ from pg_statviz.libs.info import getinfo
      help="date range to be analyzed in ISO 8601 format e.g. 2026-01-01T00:00"
           + " 2026-01-01T23:59")
 @arg('-O', '--outputdir', help="output directory")
+@arg('-A', '--ai', nargs='?', const=DEFAULT_AI_PROVIDER, default=None,
+     choices=AI_PROVIDERS, metavar='PROVIDER',
+     help="enable AI analysis (default provider: " + DEFAULT_AI_PROVIDER
+          + "). Choices: claude (Anthropic), gemini (Google AI Studio), "
+            "local (Ollama vision model).")
 @arg('--info', help=argparse.SUPPRESS)
 @arg('--conn', help=argparse.SUPPRESS)
 def wait(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
-         username=getpass.getuser(), password=False, daterange=[],
-         outputdir=None, info=None, conn=None):
+         username=getpass.getuser(), password=None, daterange=[],
+         outputdir=None, ai=None, info=None, conn=None):
     "run wait events analysis module"
 
     logging.basicConfig()
@@ -125,6 +133,9 @@ def wait(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
         rr = total_frame.resample(q + "s").mean()
     else:
         rr = total_frame
+
+    report_sections = []
+
     plt.plot_date(rr.index, rr, label='Total', aa=True, linestyle='solid')
     fig.axes[0].set_ylim(bottom=0)
     fig.gca().yaxis.set_major_locator(MaxNLocator(integer=True))
@@ -138,4 +149,16 @@ def wait(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     fig.legend()
     fig.tight_layout()
     plt.savefig(outfile)
+    run_chart_analysis(
+        report_sections, ai, rr, "Wait Events",
+        metric_description="Wait events at snapshot time. 'LWLock' = internal "
+                           "PostgreSQL contention. 'Lock' = row/table lock "
+                           "waits. 'IO' = storage waits (slow disk or cache "
+                           "misses). 'Client' = waiting for client response. "
+                           "High counts indicate bottleneck.",
+        outfile=outfile,
+    )
+
+    finalize_module_report(outputdir, info, port, 'wait',
+                           report_sections)
     mpclose('all')

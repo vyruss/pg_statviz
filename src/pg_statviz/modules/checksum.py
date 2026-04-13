@@ -15,7 +15,10 @@ from matplotlib.pyplot import close as mpclose
 from matplotlib.ticker import MaxNLocator
 from pandas import DataFrame
 from pg_statviz.libs import plot
+from pg_statviz.libs.ai import (AI_PROVIDERS, DEFAULT_AI_PROVIDER,
+                                run_chart_analysis)
 from pg_statviz.libs.dbconn import dbconn
+from pg_statviz.libs.html_report import finalize_module_report
 from pg_statviz.libs.info import getinfo
 
 
@@ -30,11 +33,16 @@ from pg_statviz.libs.info import getinfo
      help="date range to be analyzed in ISO 8601 format e.g. "
           + "2026-01-01T00:00 2026-01-01T23:59")
 @arg('-O', '--outputdir', help="output directory")
+@arg('-A', '--ai', nargs='?', const=DEFAULT_AI_PROVIDER, default=None,
+     choices=AI_PROVIDERS, metavar='PROVIDER',
+     help="enable AI analysis (default provider: " + DEFAULT_AI_PROVIDER
+          + "). Choices: claude (Anthropic), gemini (Google AI Studio), "
+            "local (Ollama vision model).")
 @arg('--info', help=argparse.SUPPRESS)
 @arg('--conn', help=argparse.SUPPRESS)
 def checksum(*, dbname=getpass.getuser(), host="/var/run/postgresql",
-             port="5432", username=getpass.getuser(), password=False,
-             daterange=[], outputdir=None, info=None, conn=None):
+             port="5432", username=getpass.getuser(), password=None,
+             daterange=[], outputdir=None, ai=None, info=None, conn=None):
     "run checksum failure analysis module"
 
     logging.basicConfig()
@@ -84,6 +92,8 @@ def checksum(*, dbname=getpass.getuser(), host="/var/run/postgresql",
     else:
         r = checksum_frame
 
+    report_sections = []
+
     # Plot checksum failures
     plt, fig = plot.setup()
     plt.suptitle(f"pg_statviz · {info['hostname']}:{port}",
@@ -104,4 +114,16 @@ def checksum(*, dbname=getpass.getuser(), host="/var/run/postgresql",
                             .replace("/", "-")}_{port}_checksum.png"""
     _logger.info(f"Saving {outfile}")
     plt.savefig(outfile)
+    run_chart_analysis(
+        report_sections, ai, r, "Checksum Failures",
+        metric_description="Data page checksum failures. ANY non-zero value "
+                           "indicates DATA CORRUPTION - this is CRITICAL. "
+                           "Causes: bad RAM, failing storage, filesystem "
+                           "bugs, or incomplete writes. Investigate "
+                           "immediately with pg_verify_checksums.",
+        outfile=outfile,
+    )
+
+    finalize_module_report(outputdir, info, port, 'checksum',
+                           report_sections)
     mpclose('all')

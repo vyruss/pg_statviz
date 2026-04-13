@@ -16,7 +16,10 @@ from matplotlib.pyplot import close as mpclose
 from matplotlib.ticker import MaxNLocator
 from pandas import DataFrame
 from pg_statviz.libs import plot
+from pg_statviz.libs.ai import (AI_PROVIDERS, DEFAULT_AI_PROVIDER,
+                                run_chart_analysis)
 from pg_statviz.libs.dbconn import dbconn
+from pg_statviz.libs.html_report import finalize_module_report
 from pg_statviz.libs.info import getinfo
 
 
@@ -31,11 +34,16 @@ from pg_statviz.libs.info import getinfo
      help="date range to be analyzed in ISO 8601 format e.g. 2026-01-01T00:00"
           + " 2026-01-01T23:59")
 @arg('-O', '--outputdir', help="output directory")
+@arg('-A', '--ai', nargs='?', const=DEFAULT_AI_PROVIDER, default=None,
+     choices=AI_PROVIDERS, metavar='PROVIDER',
+     help="enable AI analysis (default provider: " + DEFAULT_AI_PROVIDER
+          + "). Choices: claude (Anthropic), gemini (Google AI Studio), "
+            "local (Ollama vision model).")
 @arg('--info', help=argparse.SUPPRESS)
 @arg('--conn', help=argparse.SUPPRESS)
 def io(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
-       username=getpass.getuser(), password=False, daterange=[],
-       outputdir=None, info=None, conn=None):
+       username=getpass.getuser(), password=None, daterange=[],
+       outputdir=None, ai=None, info=None, conn=None):
     "run I/O analysis module"
 
     logging.basicConfig()
@@ -85,6 +93,11 @@ def io(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     blcksz = int(data[0]['block_size'])
     iostats, iokinds = calc_iostats(data, blcksz)
     iorates = calc_iorates(data, iokinds, blcksz)
+
+    # Build a flattened DataFrame for AI analysis
+    io_df = build_io_dataframe(iostats, iokinds, tstamps)
+
+    report_sections = []
 
     # Plot as many of each I/O kinds we have per snapshot
     plt, fig, splt1, splt2 = plot.setupdouble()
@@ -179,6 +192,18 @@ def io(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     plt.gcf().autofmt_xdate()
     fig.tight_layout()
     plt.savefig(outfile)
+    run_chart_analysis(
+        report_sections, ai, io_df, "I/O Statistics",
+        metric_description="I/O volume by component. 'client backend' is "
+                           "query work. High 'autovacuum' I/O may indicate "
+                           "deferred maintenance or aggressive settings. "
+                           "'checkpointer' spikes at checkpoint intervals are "
+                           "normal.",
+        outfile=outfile,
+    )
+
+    # Build rate DataFrame for AI analysis
+    rate_df = build_iorate_dataframe(iorates, iokinds, tstamps)
 
     # Plot I/O Rates
     plt, fig, splt1, splt2 = plot.setupdouble()
@@ -251,6 +276,17 @@ def io(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                             .replace("/", "-")}_{port}_io_rate.png"""
     _logger.info(f"Saving {outfile}")
     plt.savefig(outfile)
+    run_chart_analysis(
+        report_sections, ai, rate_df, "I/O Rate",
+        metric_description="I/O rates in MB/s. Sustained high rates may "
+                           "saturate storage - compare to disk IOPS/bandwidth "
+                           "limits. Sudden read spikes indicate cache misses. "
+                           "Write spikes during checkpoints are normal.",
+        outfile=outfile,
+    )
+
+    finalize_module_report(outputdir, info, port, 'io',
+                           report_sections)
     mpclose('all')
 
 
@@ -338,3 +374,58 @@ def calc_iorates(data, iokinds, blcksz=8192):
                       f"{iokind['backend_type']}/"
                       f"{iokind['context']}"] = list(iodiff(data, iokind, rw))
     return rates
+
+
+# Build a flattened DataFrame from I/O stats for AI analysis
+def build_io_dataframe(iostats, iokinds, tstamps):
+    data = {}
+    for iokind in iokinds:
+        kindname = (f"{iokind['object']}/"
+                    if {iokind['object']} == 'temp relation'
+                    else ""
+                    f"{iokind['backend_type']}/"
+                    f"{iokind['context']}")
+        reads = []
+        writes = []
+        for snapshot in iostats:
+            found = False
+            for entry in snapshot:
+                if {'backend_type': entry['backend_type'],
+                        'object': entry['object'],
+                        'context': entry['context']} == iokind:
+                    found = True
+                    r = entry.get('reads', 0) or 0
+                    w = entry.get('writes', 0) or 0
+                    reads.append(round(r / 1073741824, 2))
+                    writes.append(round(w / 1073741824, 2))
+                    break
+            if not found:
+                reads.append(0)
+                writes.append(0)
+        if not all(v == 0 for v in reads):
+            data[f"{kindname}_read_GB"] = reads
+        if not all(v == 0 for v in writes):
+            data[f"{kindname}_write_GB"] = writes
+    return DataFrame(data=data, index=tstamps, copy=False)
+
+
+# Build a flattened DataFrame from I/O rates for AI analysis
+def build_iorate_dataframe(iorates, iokinds, tstamps):
+    data = {}
+    for iokind in iokinds:
+        kindname = (f"{iokind['object']}/"
+                    if {iokind['object']} == 'temp relation'
+                    else ""
+                    f"{iokind['backend_type']}/"
+                    f"{iokind['context']}")
+        if kindname in iorates['reads']:
+            reads = [round(v / 1048576, 2) if not numpy.isnan(v) else 0
+                     for v in iorates['reads'][kindname]]
+            if not all(v == 0 for v in reads):
+                data[f"{kindname}_read_MBps"] = reads
+        if kindname in iorates['writes']:
+            writes = [round(v / 1048576, 2) if not numpy.isnan(v) else 0
+                      for v in iorates['writes'][kindname]]
+            if not all(v == 0 for v in writes):
+                data[f"{kindname}_write_MBps"] = writes
+    return DataFrame(data=data, index=tstamps, copy=False)

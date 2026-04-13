@@ -16,7 +16,10 @@ from matplotlib.pyplot import close as mpclose
 from matplotlib.ticker import MaxNLocator
 from pandas import DataFrame
 from pg_statviz.libs import plot
+from pg_statviz.libs.ai import (AI_PROVIDERS, DEFAULT_AI_PROVIDER,
+                                run_chart_analysis)
 from pg_statviz.libs.dbconn import dbconn
+from pg_statviz.libs.html_report import finalize_module_report
 from pg_statviz.libs.info import getinfo
 
 
@@ -31,11 +34,16 @@ from pg_statviz.libs.info import getinfo
      help="date range to be analyzed in ISO 8601 format e.g. 2026-01-01T00:00 "
           + "2026-01-01T23:59")
 @arg('-O', '--outputdir', help="output directory")
+@arg('-A', '--ai', nargs='?', const=DEFAULT_AI_PROVIDER, default=None,
+     choices=AI_PROVIDERS, metavar='PROVIDER',
+     help="enable AI analysis (default provider: " + DEFAULT_AI_PROVIDER
+          + "). Choices: claude (Anthropic), gemini (Google AI Studio), "
+            "local (Ollama vision model).")
 @arg('--info', help=argparse.SUPPRESS)
 @arg('--conn', help=argparse.SUPPRESS)
 def checkp(*, dbname=getpass.getuser(), host="/var/run/postgresql",
-           port="5432", username=getpass.getuser(), password=False,
-           daterange=[], outputdir=None, info=None, conn=None):
+           port="5432", username=getpass.getuser(), password=None,
+           daterange=[], outputdir=None, ai=None, info=None, conn=None):
     "run checkpoint analysis module"
 
     logging.basicConfig()
@@ -87,6 +95,8 @@ def checkp(*, dbname=getpass.getuser(), host="/var/run/postgresql",
         r = checkps_frame
         rr = checkprates_frame
 
+    report_sections = []
+
     # Plot checkpoints
     plt, fig = plot.setup()
     plt.suptitle(f"pg_statviz · {info['hostname']}:{port}",
@@ -109,6 +119,20 @@ def checkp(*, dbname=getpass.getuser(), host="/var/run/postgresql",
                             .replace("/", "-")}_{port}_checkp.png"""
     _logger.info(f"Saving {outfile}")
     plt.savefig(outfile)
+    if ai:
+        # Only pass requested column - that's what determines health status
+        ai_df = r[['req']].rename(columns={'req': 'requested_checkpoints'})
+        run_chart_analysis(
+            report_sections, ai, ai_df, "Checkpoints",
+            metric_description="Requested checkpoint count (CUMULATIVE "
+                               "COUNTER - rising values are normal, IGNORE "
+                               "trend). Requested checkpoints indicate WAL "
+                               "filled before checkpoint_timeout. DECISION "
+                               "RULE: Look at the MEAN value only. If mean < "
+                               "5: output [HEALTHY]. If mean >= 5: output "
+                               "[WARNING].",
+            outfile=outfile,
+        )
 
     # Plot WAL rates
     plt, fig = plot.setup()
@@ -129,6 +153,17 @@ def checkp(*, dbname=getpass.getuser(), host="/var/run/postgresql",
                             .replace("/", "-")}_{port}_checkp_rate.png"""
     _logger.info(f"Saving {outfile}")
     plt.savefig(outfile)
+    run_chart_analysis(
+        report_sections, ai, rr, "Checkpoint Rate",
+        metric_description="Checkpoint rate per minute. Steady 'timed' with "
+                           "near-zero 'requested' is ideal. Only concern if "
+                           "'requested' consistently >20% of 'timed'. "
+                           "Isolated tiny blips in 'requested' are normal.",
+        outfile=outfile,
+    )
+
+    finalize_module_report(outputdir, info, port, 'checkp',
+                           report_sections)
     mpclose('all')
 
 

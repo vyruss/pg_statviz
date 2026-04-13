@@ -15,7 +15,10 @@ from matplotlib.pyplot import close as mpclose
 from matplotlib.ticker import MaxNLocator
 from pandas import DataFrame
 from pg_statviz.libs import plot
+from pg_statviz.libs.ai import (AI_PROVIDERS, DEFAULT_AI_PROVIDER,
+                                run_chart_analysis)
 from pg_statviz.libs.dbconn import dbconn
+from pg_statviz.libs.html_report import finalize_module_report
 from pg_statviz.libs.info import getinfo
 
 
@@ -30,11 +33,16 @@ from pg_statviz.libs.info import getinfo
      help="date range to be analyzed in ISO 8601 format e.g. 2026-01-01T00:00"
           + " 2026-01-01T23:59")
 @arg('-O', '--outputdir', help="output directory")
+@arg('-A', '--ai', nargs='?', const=DEFAULT_AI_PROVIDER, default=None,
+     choices=AI_PROVIDERS, metavar='PROVIDER',
+     help="enable AI analysis (default provider: " + DEFAULT_AI_PROVIDER
+          + "). Choices: claude (Anthropic), gemini (Google AI Studio), "
+            "local (Ollama vision model).")
 @arg('--info', help=argparse.SUPPRESS)
 @arg('--conn', help=argparse.SUPPRESS)
 def lock(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
-         username=getpass.getuser(), password=False, daterange=[],
-         outputdir=None, info=None, conn=None):
+         username=getpass.getuser(), password=None, daterange=[],
+         outputdir=None, ai=None, info=None, conn=None):
     "run locks analysis module"
 
     logging.basicConfig()
@@ -120,6 +128,9 @@ def lock(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
         rr = total_frame.resample(q + "s").mean()
     else:
         rr = total_frame
+
+    report_sections = []
+
     plt.plot_date(rr.index, rr, label='Total', aa=True, linestyle='solid')
     fig.axes[0].set_ylim(bottom=0)
     fig.gca().yaxis.set_major_locator(MaxNLocator(integer=True))
@@ -133,4 +144,16 @@ def lock(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     fig.legend()
     fig.tight_layout()
     plt.savefig(outfile)
+    run_chart_analysis(
+        report_sections, ai, rr, "Locks",
+        metric_description="Active locks (point-in-time snapshots). Low "
+                           "counts (<10) are normal for any active database. "
+                           "Values <1.0 are fractional averages - essentially "
+                           "zero. Only concern if sustained high counts (>50) "
+                           "or 'AccessExclusive' locks blocking operations.",
+        outfile=outfile,
+    )
+
+    finalize_module_report(outputdir, info, port, 'lock',
+                           report_sections)
     mpclose('all')

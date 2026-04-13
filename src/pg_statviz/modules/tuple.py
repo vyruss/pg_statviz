@@ -15,7 +15,10 @@ from dateutil.parser import isoparse
 from matplotlib.pyplot import close as mpclose
 from pandas import DataFrame
 from pg_statviz.libs import plot
+from pg_statviz.libs.ai import (AI_PROVIDERS, DEFAULT_AI_PROVIDER,
+                                run_chart_analysis)
 from pg_statviz.libs.dbconn import dbconn
+from pg_statviz.libs.html_report import finalize_module_report
 from pg_statviz.libs.info import getinfo
 
 
@@ -30,11 +33,16 @@ from pg_statviz.libs.info import getinfo
      help="date range to be analyzed in ISO 8601 format e.g. 2026-01-01T00:00 "
           + "2026-01-01T23:59")
 @arg('-O', '--outputdir', help="output directory")
+@arg('-A', '--ai', nargs='?', const=DEFAULT_AI_PROVIDER, default=None,
+     choices=AI_PROVIDERS, metavar='PROVIDER',
+     help="enable AI analysis (default provider: " + DEFAULT_AI_PROVIDER
+          + "). Choices: claude (Anthropic), gemini (Google AI Studio), "
+            "local (Ollama vision model).")
 @arg('--info', help=argparse.SUPPRESS)
 @arg('--conn', help=argparse.SUPPRESS)
 def tuple(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
-          username=getpass.getuser(), password=False, daterange=[],
-          outputdir=None, info=None, conn=None):
+          username=getpass.getuser(), password=None, daterange=[],
+          outputdir=None, ai=None, info=None, conn=None):
     "run tuple count analysis module"
 
     logging.basicConfig()
@@ -98,6 +106,8 @@ def tuple(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
         r = tuple_frame
         rr = tuplerate_frame
 
+    report_sections = []
+
     # Plot tuples read
     plt, fig, splt1, splt2 = plot.setupdouble()
     plt.suptitle(f"pg_statviz · {info['hostname']}:{port}",
@@ -133,6 +143,15 @@ def tuple(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                             .replace("/", "-")}_{port}_tuple.png"""
     _logger.info(f"Saving {outfile}")
     plt.savefig(outfile)
+    run_chart_analysis(
+        report_sections, ai, r, "Tuple Statistics",
+        metric_description="Tuple operations. Large 'deleted' + 'updated' "
+                           "generates dead tuples requiring vacuum. Big gap "
+                           "between 'returned' vs 'fetched' means sequential "
+                           "scans returning many filtered rows - check for "
+                           "missing indexes.",
+        outfile=outfile,
+    )
 
     # Plot tuple read rates
     plt, fig, splt1, splt2 = plot.setupdouble()
@@ -169,6 +188,18 @@ def tuple(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                             .replace("/", "-")}_{port}_tuple_rate.png"""
     _logger.info(f"Saving {outfile}")
     plt.savefig(outfile)
+    run_chart_analysis(
+        report_sections, ai, rr, "Tuple Rate",
+        metric_description="Tuple operation rates. High 'updated'/'deleted' "
+                           "rate generates table bloat faster than autovacuum "
+                           "can clean. Sudden drops may indicate blocking or "
+                           "application issues. Compare patterns to identify "
+                           "workload changes.",
+        outfile=outfile,
+    )
+
+    finalize_module_report(outputdir, info, port, 'tuple',
+                           report_sections)
     mpclose('all')
 
 
