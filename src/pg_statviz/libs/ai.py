@@ -52,9 +52,10 @@ except ImportError:
 CLAUDE_MODEL = "claude-sonnet-4-6"
 # latest free-tier-eligible Gemini (Apr 2026)
 GEMINI_MODEL = "gemini-2.5-flash"
-# Gemma 4 E4B: Google's current small vision-capable open model. ~4.5B
-# effective params, runs in ~6 GB VRAM, strong on charts/OCR -- ideal for
-# reading pg_statviz's matplotlib PNGs on a laptop GPU.
+# Gemma 4 E4B: Google's current small vision-capable open model.
+# ~4.5B effective params, vision-capable (reads chart PNGs).
+# Needs ~10 GB VRAM to run fully on GPU; partially offloads to
+# CPU on smaller cards.
 OLLAMA_MODEL = "gemma4:e4b"
 
 # Selectable provider keys exposed on the CLI as `--ai [PROVIDER]`.
