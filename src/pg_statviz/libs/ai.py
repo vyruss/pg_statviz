@@ -261,7 +261,7 @@ def _analyze_claude(df: pd.DataFrame, module_name: str,
         with _timed("Claude"):
             response = anthropic.Anthropic().messages.create(
                 model=CLAUDE_MODEL,
-                max_tokens=1024,
+                max_tokens=16384,
                 # Cache the static system prompt so repeated module calls
                 # within a 5-minute window pay only once for the system
                 # tokens -- keeps the free tier comfortable across analyze.
@@ -302,13 +302,13 @@ def _analyze_gemini(df: pd.DataFrame, module_name: str,
     parts.append(google_genai_types.Part.from_text(text=user_text))
 
     try:
+        client = google_genai.Client()
         with _timed("Gemini"):
-            response = google_genai.Client().models.generate_content(
+            response = client.models.generate_content(
                 model=GEMINI_MODEL,
                 contents=parts,
                 config=google_genai_types.GenerateContentConfig(
                     system_instruction=SYSTEM_PROMPT,
-                    max_output_tokens=1024,
                 ),
             )
         return response.text
