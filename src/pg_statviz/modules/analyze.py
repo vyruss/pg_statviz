@@ -7,6 +7,7 @@ __copyright__ = "Copyright (c) 2026 Jimmy Angelakos"
 __license__ = "PostgreSQL License"
 
 import getpass
+import logging
 from argh.decorators import arg
 from pg_statviz.libs.ai import AI_PROVIDERS, DEFAULT_AI_PROVIDER
 from pg_statviz.modules.buf import buf
@@ -53,19 +54,13 @@ def analyze(*, dbname=getpass.getuser(), host="/var/run/postgresql",
                     else password, 'host': host, 'port': port}
     connx = dbconn(**conn_details)
     info = getinfo(connx)
+    _logger = logging.getLogger(__name__)
     common = dict(daterange=daterange, outputdir=outputdir, ai=ai,
                   info=info, conn=connx)
-    buf(**common)
-    checkp(**common)
-    cache(**common)
-    checksum(**common)
-    conf(**common)
-    conn(**common)
-    io(**common)
-    lock(**common)
-    repl(**common)
-    slru(**common)
-    tuple(**common)
-    wait(**common)
-    wal(**common)
-    xact(**common)
+    for mod in (buf, checkp, cache, checksum, conf, conn, io,
+                lock, repl, slru, tuple, wait, wal, xact):
+        try:
+            mod(**common)
+        except SystemExit as e:
+            _logger.warning(f"{mod.__name__}: {e}")
+            continue
