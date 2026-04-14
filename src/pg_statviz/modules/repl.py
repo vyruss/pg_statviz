@@ -188,12 +188,13 @@ def repl(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     if ai and not repl_df.empty:
         run_chart_analysis(
             report_sections, ai, repl_df, "Replication",
-            metric_description="Replication health. Growing lag means standby "
-                               "can't keep up - causes: slow standby storage, "
-                               "network issues, long queries on standby, or "
-                               "recovery conflicts. High slot WAL retention "
-                               "wastes disk and risks WAL wraparound if slot "
-                               "consumer is down.",
+            metric_description="Replication lag and slot WAL retention "
+                               "in bytes (point-in-time). Growing lag "
+                               "means standby can't keep up. High "
+                               "slot WAL retention risks WAL "
+                               "wraparound if consumer is down. Warn "
+                               "only if lag sustained >1 GB or slot "
+                               "WAL >10 GB. Default to [HEALTHY].",
             outfile=outfile,
         )
 

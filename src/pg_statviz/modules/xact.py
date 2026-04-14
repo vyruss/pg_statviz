@@ -156,11 +156,13 @@ def xact(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     plt.savefig(outfile)
     run_chart_analysis(
         report_sections, ai, rr, "Transaction Rate",
-        metric_description="Transaction rates. Baseline varies by workload. "
-                           "Sudden drops indicate blocking, connection "
-                           "exhaustion, or application issues. Compare commit "
-                           "vs rollback trends - rising rollback rate "
-                           "suggests application problems.",
+        metric_description="Transaction RATES (derived from cumulative "
+                           "counters). NaN values appear on "
+                           "stats_reset — IGNORE them. Rising "
+                           "rollback rate suggests application "
+                           "problems. Warn only if rollback rate "
+                           "exceeds 5% of commit rate (sustained). "
+                           "Default to [HEALTHY].",
         outfile=outfile,
     )
 

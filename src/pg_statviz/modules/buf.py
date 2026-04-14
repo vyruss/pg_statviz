@@ -161,11 +161,13 @@ def buf(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     plt.savefig(outfile)
     run_chart_analysis(
         report_sections, ai, rr, "Buffer Write Rate",
-        metric_description="Buffer write rates in MB/s. Steady checkpoint and "
-                           "bgwriter rates are normal. Only concern if "
-                           "'backends' rate consistently >10% of total rate. "
-                           "Isolated tiny blips in backends are normal. "
-                           "Spikes during checkpoints are expected.",
+        metric_description="Buffer write RATES in MB/s (derived from "
+                           "cumulative counters). NaN values appear "
+                           "on stats_reset — IGNORE them. Checkpoint "
+                           "and bgwriter activity is normal. Warn "
+                           "only if 'backends' rate consistently "
+                           ">10% of total rate. Default to "
+                           "[HEALTHY].",
         outfile=outfile,
     )
 

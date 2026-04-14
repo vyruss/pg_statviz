@@ -259,11 +259,15 @@ def conn(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     plt.savefig(outfile)
     run_chart_analysis(
         report_sections, ai, ra, "Session Activity Age",
-        metric_description="Session ages. Long-running queries block "
-                           "autovacuum. Old transactions prevent dead tuple "
-                           "cleanup causing bloat. Backend age >1 hour often "
-                           "indicates connection pool misconfiguration or "
-                           "leaked connections.",
+        metric_description="Session ages in seconds (point-in-time). "
+                           "Long-running queries block autovacuum. "
+                           "Old transactions prevent dead tuple "
+                           "cleanup causing bloat. IGNORE "
+                           "max_backend_age — long-lived backends "
+                           "are normal with connection pools. Warn "
+                           "only if max_query_age or max_xact_age "
+                           "sustained >3600 (1 hour). Default to "
+                           "[HEALTHY].",
         outfile=outfile,
     )
 

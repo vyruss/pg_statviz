@@ -145,11 +145,12 @@ def tuple(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     plt.savefig(outfile)
     run_chart_analysis(
         report_sections, ai, r, "Tuple Statistics",
-        metric_description="Tuple operations. Large 'deleted' + 'updated' "
-                           "generates dead tuples requiring vacuum. Big gap "
-                           "between 'returned' vs 'fetched' means sequential "
-                           "scans returning many filtered rows - check for "
-                           "missing indexes.",
+        metric_description="CUMULATIVE COUNTER — rising values are "
+                           "NORMAL. Large deleted+updated generates "
+                           "dead tuples requiring vacuum. Large "
+                           "returned vs fetched gap suggests seq "
+                           "scans with many filtered rows. No "
+                           "warning threshold. Default to [HEALTHY].",
         outfile=outfile,
     )
 
@@ -190,11 +191,12 @@ def tuple(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     plt.savefig(outfile)
     run_chart_analysis(
         report_sections, ai, rr, "Tuple Rate",
-        metric_description="Tuple operation rates. High 'updated'/'deleted' "
-                           "rate generates table bloat faster than autovacuum "
-                           "can clean. Sudden drops may indicate blocking or "
-                           "application issues. Compare patterns to identify "
-                           "workload changes.",
+        metric_description="Tuple operation RATES (derived from "
+                           "cumulative counters). NaN values appear "
+                           "on stats_reset — IGNORE them. High "
+                           "update/delete rate generates bloat "
+                           "faster than autovacuum can clean. No "
+                           "warning threshold. Default to [HEALTHY].",
         outfile=outfile,
     )
 

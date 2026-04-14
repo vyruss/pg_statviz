@@ -126,11 +126,12 @@ def wal(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     plt.savefig(outfile)
     run_chart_analysis(
         report_sections, ai, r, "WAL Generated",
-        metric_description="Write-Ahead Log volume. Large WAL = many writes "
-                           "or full_page_writes after checkpoint. Affects "
-                           "replication lag, backup size, and recovery time. "
-                           "Sudden jumps may indicate bulk operations or "
-                           "checkpoint activity.",
+        metric_description="CUMULATIVE COUNTER — rising values are "
+                           "NORMAL. Large WAL = many writes or "
+                           "full_page_writes after checkpoint. "
+                           "Affects replication lag, backup size, "
+                           "and recovery time. No warning threshold. "
+                           "Default to [HEALTHY].",
         outfile=outfile,
     )
 
@@ -153,11 +154,14 @@ def wal(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     plt.savefig(outfile)
     run_chart_analysis(
         report_sections, ai, rr, "WAL Generation Rate",
-        metric_description="WAL generation rate. Sustained >100 MB/s is heavy "
-                           "write load. High rates increase replication lag "
-                           "and I/O pressure. Spikes after checkpoint due to "
-                           "full_page_writes are normal. Consider "
-                           "wal_compression if rate is consistently high.",
+        metric_description="WAL generation RATE (derived from "
+                           "cumulative counter). NaN values appear "
+                           "on stats_reset — IGNORE them. High rates "
+                           "increase replication lag and I/O "
+                           "pressure. Spikes after checkpoint due to "
+                           "full_page_writes are normal. Warn only "
+                           "if sustained mean >100 MB/s. Default to "
+                           "[HEALTHY].",
         outfile=outfile,
     )
 

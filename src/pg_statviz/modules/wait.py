@@ -151,11 +151,14 @@ def wait(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     plt.savefig(outfile)
     run_chart_analysis(
         report_sections, ai, rr, "Wait Events",
-        metric_description="Wait events at snapshot time. 'LWLock' = internal "
-                           "PostgreSQL contention. 'Lock' = row/table lock "
-                           "waits. 'IO' = storage waits (slow disk or cache "
-                           "misses). 'Client' = waiting for client response. "
-                           "High counts indicate bottleneck.",
+        metric_description="Wait events (point-in-time snapshots). "
+                           "'LWLock' = internal contention. 'Lock' = "
+                           "row/table lock waits. 'IO' = storage "
+                           "waits. 'Client' = waiting for client "
+                           "response. Values <1.0 are fractional "
+                           "averages — essentially zero. Warn only "
+                           "if total wait count sustained >50. "
+                           "Default to [HEALTHY].",
         outfile=outfile,
     )
 

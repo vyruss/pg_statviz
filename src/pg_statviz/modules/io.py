@@ -194,11 +194,12 @@ def io(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     plt.savefig(outfile)
     run_chart_analysis(
         report_sections, ai, io_df, "I/O Statistics",
-        metric_description="I/O volume by component. 'client backend' is "
-                           "query work. High 'autovacuum' I/O may indicate "
-                           "deferred maintenance or aggressive settings. "
-                           "'checkpointer' spikes at checkpoint intervals are "
-                           "normal.",
+        metric_description="CUMULATIVE COUNTER — rising values are "
+                           "NORMAL. I/O volume by component. "
+                           "'client backend' is query work. "
+                           "'checkpointer' spikes at checkpoint "
+                           "intervals are normal. No warning "
+                           "threshold. Default to [HEALTHY].",
         outfile=outfile,
     )
 
@@ -278,10 +279,13 @@ def io(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     plt.savefig(outfile)
     run_chart_analysis(
         report_sections, ai, rate_df, "I/O Rate",
-        metric_description="I/O rates in MB/s. Sustained high rates may "
-                           "saturate storage - compare to disk IOPS/bandwidth "
-                           "limits. Sudden read spikes indicate cache misses. "
-                           "Write spikes during checkpoints are normal.",
+        metric_description="I/O RATES in MB/s (derived from cumulative "
+                           "counters). NaN values appear on "
+                           "stats_reset — IGNORE them. Read spikes "
+                           "indicate cache misses. Write spikes "
+                           "during checkpoints are normal. No "
+                           "warning threshold (storage limits vary). "
+                           "Default to [HEALTHY].",
         outfile=outfile,
     )
 

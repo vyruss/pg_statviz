@@ -178,12 +178,12 @@ def slru(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
         if not slru_df.empty:
             run_chart_analysis(
                 report_sections, ai, slru_df, "SLRU",
-                metric_description="Simple LRU caches (blks_read is "
-                                   "cumulative - resets periodically). Rising "
-                                   "read counts are NORMAL. Only concern: hit "
-                                   "ratio <99% on Clog, or hit ratio "
-                                   "consistently degrading. Steady 99%+ hit "
-                                   "ratio with growing reads is healthy.",
+                metric_description="SLRU cache statistics. *_blks_read "
+                                   "columns are CUMULATIVE COUNTERS — "
+                                   "rising values are NORMAL, IGNORE "
+                                   "them. Warn only if any *_hit_ratio "
+                                   "column mean <95%. Default to "
+                                   "[HEALTHY].",
                 outfile=outfile,
             )
 
