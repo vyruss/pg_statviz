@@ -1020,7 +1020,8 @@ def test_calc_iorates():
             "client  backend/bulkwrite": [
                 numpy.nan, numpy.nan, numpy.nan, numpy.nan, numpy.nan],
             "client backend/normal": [
-                numpy.nan, numpy.nan, numpy.nan, numpy.nan, 81100800.0],
+                numpy.nan, numpy.nan, numpy.nan, numpy.nan,
+                664377753600.0],
             "client backend/vacuum": [numpy.nan, 0.0, numpy.nan, 0.0, 0.0],
             "background worker/normal": [numpy.nan, 0.0, numpy.nan, 0.0, 0.0],
             "background writer/normal": [
@@ -1043,7 +1044,8 @@ def test_calc_iorates():
             "client  backend/bulkwrite": [
                 numpy.nan, 0.0, numpy.nan, numpy.nan, numpy.nan],
             "client backend/normal": [
-                numpy.nan, numpy.nan, numpy.nan, numpy.nan, 376012800.0],
+                numpy.nan, numpy.nan, numpy.nan, numpy.nan,
+                3080296857600.0],
             "client backend/vacuum": [numpy.nan, 0.0, numpy.nan, 0.0, 0.0],
             "background worker/normal": [
                 numpy.nan, numpy.nan, numpy.nan, numpy.nan, numpy.nan,
