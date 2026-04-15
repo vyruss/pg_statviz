@@ -10,6 +10,9 @@ time series analysis than the standard PostgreSQL statistics views. The included
 visualizations for selected time ranges from the stored statistic snapshots, helping users track
 PostgreSQL performance over time and potentially aiding in performance tuning and troubleshooting.
 
+Optionally, an [AI analysis](#ai-analysis-optional) mode can produce per-module HTML reports
+with chart commentary from a cloud LLM (Claude or Gemini) or a local model via Ollama.
+
 ## Design Philosophy
 
 Designed with the [K.I.S.S.](https://en.wikipedia.org/wiki/KISS_principle) and
@@ -245,6 +248,45 @@ The visualization utility can be called like a PostgreSQL command line tool:
 
 ![conf output sample](src/pg_statviz/libs/pg_statviz_localhost_5432_conf.png)
 
+## AI Analysis (optional)
+
+`pg_statviz` can optionally generate AI-powered analysis of each chart, producing
+per-module HTML reports with embedded chart images and LLM commentary. The AI acts
+as a Senior PostgreSQL DBA, reviewing each chart and providing a **[HEALTHY]** or
+**[WARNING]** verdict with a brief interpretation.
+
+### Enabling AI analysis
+
+Add `--ai` (or `-A`) to any command:
+
+    pg_statviz analyze -d mydb --ai
+
+This uses Claude by default. Three providers are available:
+
+Provider | Flag | Requires
+--- | --- | ---
+[Claude](https://www.anthropic.com/) (Anthropic) | `--ai claude` or `--ai` | `ANTHROPIC_API_KEY`
+[Gemini](https://aistudio.google.com/) (Google AI Studio) | `--ai gemini` | `GOOGLE_API_KEY`
+Local ([Ollama](https://ollama.com/)) | `--ai local` | Ollama running with `gemma4:e4b`
+
+### Installing AI dependencies
+
+The AI libraries are **not** required for normal operation. Install them only if
+you want to use `--ai`:
+
+    pip install pg_statviz[ai]
+
+For the local provider, install and start Ollama, then pull the model:
+
+    ollama pull gemma4:e4b
+
+### Output
+
+When `--ai` is enabled, each module produces an HTML report alongside the chart
+PNGs (e.g. `pg_statviz_localhost_5432_buf.html`). The report embeds the chart
+images and renders the AI analysis as styled HTML.
+
+![AI report sample](src/pg_statviz/libs/pg_statviz_ai_report_sample.png)
 
 ## Schema
 
