@@ -339,7 +339,11 @@ def _analyze_local(df: pd.DataFrame, module_name: str,
 
     try:
         with _timed("local Ollama"):
-            response = ollama.chat(model=OLLAMA_MODEL, messages=[message])
+            # think=False disables Gemma 4's hidden reasoning tokens, which
+            # otherwise generate ~800+ discarded tokens per call (5–10× the
+            # visible answer size) and dominate latency on iGPU.
+            response = ollama.chat(model=OLLAMA_MODEL, messages=[message],
+                                   think=False)
         return response['message']['content']
     except Exception as e:
         err = str(e).lower()
