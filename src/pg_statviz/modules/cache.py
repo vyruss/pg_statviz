@@ -79,6 +79,19 @@ def cache(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     tstamps = [t['snapshot_tstamp'] for t in data]
     ratio = calc_ratio(data)
     settings = get_settings(conn, ['shared_buffers'])
+    findings = []
+    nz = [r for r in ratio if r > 0]
+    mean_hit = sum(nz) / len(nz) if nz else 100.0
+    if mean_hit < 90.0:
+        findings.append({
+            'severity': 'CRITICAL',
+            'message': f'mean cache hit ratio {mean_hit:.1f}% < 90%',
+        })
+    elif mean_hit < 95.0:
+        findings.append({
+            'severity': 'WARNING',
+            'message': f'mean cache hit ratio {mean_hit:.1f}% < 95%',
+        })
 
     # Downsample if needed
     ratio_frame = DataFrame(data=ratio, index=tstamps, copy=False)
@@ -120,6 +133,7 @@ def cache(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
         outfile=outfile,
         info=info,
         settings=settings,
+        findings=findings,
     )
 
     finalize_module_report(outputdir, info, port, 'cache',

@@ -85,6 +85,15 @@ def checkp(*, dbname=getpass.getuser(), host="/var/run/postgresql",
     settings = get_settings(conn, ['checkpoint_timeout',
                                    'checkpoint_completion_target',
                                    'max_wal_size'])
+    findings = []
+    req_mean = (sum(checkps['req']) / len(checkps['req'])
+                if checkps.get('req') else 0)
+    if req_mean >= 5:
+        findings.append({
+            'severity': 'WARNING',
+            'message': f'mean requested checkpoints {req_mean:.1f} >= 5 '
+                       f'(WAL filling before checkpoint_timeout)',
+        })
 
     # Downsample if needed
     checkps_frame = DataFrame(data=checkps, index=tstamps, copy=False)
@@ -137,6 +146,7 @@ def checkp(*, dbname=getpass.getuser(), host="/var/run/postgresql",
             outfile=outfile,
             info=info,
             settings=settings,
+            findings=findings,
         )
 
     # Plot WAL rates

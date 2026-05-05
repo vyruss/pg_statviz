@@ -260,6 +260,23 @@ def conn(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                             .replace("/", "-")}_{port}_conn_age.png"""
     _logger.info(f"Saving {outfile}")
     plt.savefig(outfile)
+    age_findings = []
+    max_q = max(max_query_age) if max_query_age else 0
+    max_x = max(max_xact_age) if max_xact_age else 0
+    if max_q > 7200 or max_x > 7200:
+        age_findings.append({
+            'severity': 'CRITICAL',
+            'message': f'max_query_age peak {max_q}s, '
+                       f'max_xact_age peak {max_x}s '
+                       f'(threshold 7200s for CRITICAL)',
+        })
+    elif max_q > 3600 or max_x > 3600:
+        age_findings.append({
+            'severity': 'WARNING',
+            'message': f'max_query_age peak {max_q}s, '
+                       f'max_xact_age peak {max_x}s '
+                       f'(threshold 3600s for WARNING)',
+        })
     run_chart_analysis(
         report_sections, ai, ra, "Session Activity Age",
         metric_description="Session ages in seconds (point-in-time). "
@@ -274,6 +291,7 @@ def conn(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
         outfile=outfile,
         info=info,
         settings=settings,
+        findings=age_findings,
     )
 
     finalize_module_report(outputdir, info, port, 'conn',

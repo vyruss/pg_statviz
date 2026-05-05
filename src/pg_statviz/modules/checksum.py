@@ -80,6 +80,14 @@ def checksum(*, dbname=getpass.getuser(), host="/var/run/postgresql",
     tstamps = [t['snapshot_tstamp'] for t in data]
     failures = [t['checksum_failures'] if t['checksum_failures'] is not None
                 else 0 for t in data]
+    findings = []
+    last_failures = failures[-1] if failures else 0
+    if last_failures > 0:
+        findings.append({
+            'severity': 'CRITICAL',
+            'message': f'{last_failures} checksum failures recorded - '
+                       f'possible data corruption',
+        })
 
     # Downsample if needed
     checksum_frame = DataFrame(
@@ -123,6 +131,7 @@ def checksum(*, dbname=getpass.getuser(), host="/var/run/postgresql",
                            "immediately with pg_verify_checksums.",
         outfile=outfile,
         info=info,
+        findings=findings,
     )
 
     finalize_module_report(outputdir, info, port, 'checksum',

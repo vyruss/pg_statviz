@@ -13,6 +13,7 @@ __license__ = "PostgreSQL License"
 import base64
 import logging
 import os
+import re
 import time
 from contextlib import contextmanager
 from pathlib import Path
@@ -193,6 +194,63 @@ def _build_context_block(info: dict | None) -> str:
     return "### Server context\n" + "\n".join(parts) + "\n\n"
 
 
+# Ordered worst-to-best so that floor calculations and tag comparisons can
+# treat severity as a simple int rank.
+SEVERITY_ORDER = {'HEALTHY': 0, 'WARNING': 1, 'CRITICAL': 2}
+
+# Tolerant verdict-tag regex: matches **[HEALTHY]**, [WARNING], etc.
+_STATUS_RE = re.compile(
+    r"\*{0,2}\[\s*(HEALTHY|WARNING|CRITICAL)\s*\]\*{0,2}",
+    re.IGNORECASE,
+)
+
+
+def _build_findings_block(findings: list | None) -> str:
+    """Render deterministic rule findings into the prompt.
+
+    Findings are computed by leaf modules from the actual numeric data and
+    then handed to the LLM as additional context, so the model is grounded
+    in objective threshold breaches rather than relying solely on its own
+    pattern-matching of the data summary.
+    """
+    if not findings:
+        return ""
+    lines = [f"- [{f.get('severity', 'WARNING').upper()}] "
+             f"{f.get('message', '')}"
+             for f in findings]
+    return ("### Deterministic rule findings\n<user_data>\n"
+            + "\n".join(lines) + "\n</user_data>\n\n")
+
+
+def apply_severity_floor(md: str | None, findings: list | None) -> str | None:
+    """Ensure the LLM's verdict tag is at least as severe as the worst
+    deterministic rule finding. If not, rewrite the first tag in the
+    markdown to the floor.
+
+    Returns the (possibly modified) markdown, or the original if no
+    findings were given or no tag was found.
+    """
+    if not md or not findings:
+        return md
+    floor = max(
+        (SEVERITY_ORDER.get(f.get('severity', 'HEALTHY').upper(), 0)
+         for f in findings),
+        default=0,
+    )
+    if floor == 0:
+        return md
+    m = _STATUS_RE.search(md)
+    if not m:
+        return md
+    llm_rank = SEVERITY_ORDER.get(m.group(1).upper(), 0)
+    if llm_rank >= floor:
+        return md
+    floor_name = next(name for name, rank in SEVERITY_ORDER.items()
+                      if rank == floor)
+    new_tag = f"**[{floor_name}]**"
+    return md[:m.start()] + new_tag + md[m.end():]
+
+
 def _build_settings_block(settings: dict | None) -> str:
     """Render the optional 'current PostgreSQL settings' block.
 
@@ -208,7 +266,8 @@ def _build_settings_block(settings: dict | None) -> str:
 
 def _build_user_text(module_name: str, metric_description: str,
                      df: pd.DataFrame, info: dict | None = None,
-                     settings: dict | None = None) -> str:
+                     settings: dict | None = None,
+                     findings: list | None = None) -> str:
     """Build the textual half of the prompt (data summary + trend)."""
     numeric_df = df.select_dtypes(include=['number'])
     if not numeric_df.empty:
@@ -232,7 +291,9 @@ def _build_user_text(module_name: str, metric_description: str,
             pass
     trend_summary = "\n".join(trend_info) if trend_info else "N/A"
 
-    context = _build_context_block(info) + _build_settings_block(settings)
+    context = (_build_context_block(info)
+               + _build_settings_block(settings)
+               + _build_findings_block(findings))
     return f"""{context}### Module
 {module_name}
 
@@ -300,7 +361,8 @@ def _log_provider_error(label: str, env_var_hint: str, e: Exception) -> None:
 def _analyze_claude(df: pd.DataFrame, module_name: str,
                     metric_description: str,
                     image_paths, info: dict | None = None,
-                    settings: dict | None = None) -> str | None:
+                    settings: dict | None = None,
+                    findings: list | None = None) -> str | None:
     """Run analysis via the Anthropic Claude API."""
     if not ANTHROPIC_AVAILABLE:
         _logger.warning("anthropic package not installed."
@@ -312,7 +374,7 @@ def _analyze_claude(df: pd.DataFrame, module_name: str,
         return None
 
     user_text = _build_user_text(module_name, metric_description, df,
-                                 info, settings)
+                                 info, settings, findings)
 
     # Images first then text: Claude weights later content more strongly and
     # we want the textual instructions to lead the analysis.
@@ -353,7 +415,8 @@ def _analyze_claude(df: pd.DataFrame, module_name: str,
 def _analyze_gemini(df: pd.DataFrame, module_name: str,
                     metric_description: str,
                     image_paths, info: dict | None = None,
-                    settings: dict | None = None) -> str | None:
+                    settings: dict | None = None,
+                    findings: list | None = None) -> str | None:
     """Run analysis via the Google Gemini API (AI Studio free tier)."""
     if not GOOGLE_GENAI_AVAILABLE:
         _logger.warning("google-genai package not installed."
@@ -367,7 +430,7 @@ def _analyze_gemini(df: pd.DataFrame, module_name: str,
         return None
 
     user_text = _build_user_text(module_name, metric_description, df,
-                                 info, settings)
+                                 info, settings, findings)
     # Same content ordering rationale as Claude: images then text.
     parts = [google_genai_types.Part.from_bytes(data=img,
                                                 mime_type='image/png')
@@ -393,7 +456,8 @@ def _analyze_gemini(df: pd.DataFrame, module_name: str,
 def _analyze_local(df: pd.DataFrame, module_name: str,
                    metric_description: str,
                    image_paths, info: dict | None = None,
-                   settings: dict | None = None) -> str | None:
+                   settings: dict | None = None,
+                   findings: list | None = None) -> str | None:
     """Run analysis via local Ollama with a vision-capable model."""
     if not OLLAMA_AVAILABLE:
         _logger.warning("ollama package not installed." + OLLAMA_INSTALL_GUIDE)
@@ -402,7 +466,7 @@ def _analyze_local(df: pd.DataFrame, module_name: str,
     # Ollama takes a single-string prompt + a separate `images` field rather
     # than Anthropic-style content blocks, so concatenate system + user.
     prompt = SYSTEM_PROMPT + "\n\n" + _build_user_text(
-        module_name, metric_description, df, info, settings)
+        module_name, metric_description, df, info, settings, findings)
     # The SDK accepts file paths directly and base64-encodes them internally.
     valid_images = [str(p) for p in (image_paths or []) if Path(p).is_file()]
 
@@ -467,7 +531,8 @@ def analyze_stats(df: pd.DataFrame, module_name: str,
                   image_paths=None,
                   mode: str = DEFAULT_AI_PROVIDER,
                   info: dict | None = None,
-                  settings: dict | None = None) -> str | None:
+                  settings: dict | None = None,
+                  findings: list | None = None) -> str | None:
     """
     Analyze DataFrame statistics (and optional chart images) with an LLM.
 
@@ -497,7 +562,7 @@ def analyze_stats(df: pd.DataFrame, module_name: str,
                  f"for {module_name}...")
     try:
         return provider['fn'](df, module_name, metric_description,
-                              image_paths, info, settings)
+                              image_paths, info, settings, findings)
     except Exception as e:
         # Defence in depth: each adapter already catches; this guarantees the
         # return-None contract holds even if a future adapter forgets to.
@@ -508,7 +573,8 @@ def analyze_stats(df: pd.DataFrame, module_name: str,
 def run_chart_analysis(report_sections: list, ai, df: pd.DataFrame,
                        title: str, metric_description: str,
                        outfile: str, info: dict | None = None,
-                       settings: dict | None = None) -> None:
+                       settings: dict | None = None,
+                       findings: list | None = None) -> None:
     """Run the AI analysis for one chart and append a section dict to
     report_sections. No-op when ai is None.
 
@@ -526,12 +592,16 @@ def run_chart_analysis(report_sections: list, ai, df: pd.DataFrame,
             HTML as <img src="..."> so the report loads it from the same dir).
         info: Optional host/PG context dict, forwarded to the LLM prompt.
         settings: Optional {guc: value} dict of relevant PostgreSQL settings.
+        findings: Optional list of {'severity', 'message'} deterministic
+            rule findings. Passed to the LLM as additional context, then
+            used post-call to enforce a severity floor on the verdict.
     """
     if not ai:
         return
     md = analyze_stats(df, title, metric_description,
                        image_paths=[outfile], mode=ai, info=info,
-                       settings=settings)
+                       settings=settings, findings=findings)
+    md = apply_severity_floor(md, findings)
     report_sections.append({
         'title': title,
         'image_basename': os.path.basename(outfile),
