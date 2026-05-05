@@ -130,6 +130,9 @@ Your output MUST be:
    **[CRITICAL]**.
 2. Two to three sentences interpreting the data for a PostgreSQL administrator.
 3. Focus on resource saturation, contention, or performance implications.
+4. If [WARNING] or [CRITICAL], finish with one concrete remediation step
+   (a setting to tune, a query/index to investigate, a config to change).
+   For [HEALTHY], do not invent recommendations.
 
 Severity scale:
 - [HEALTHY]: nothing actionable.
