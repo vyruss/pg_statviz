@@ -146,7 +146,7 @@ _CSS = """
   .status.critical { background: #f8d7da; color: #721c24; }
   .missing { color: #888; font-style: italic; }
   .module-list { list-style: none; padding-left: 0; }
-  .module-list li { padding: .4em 0; border-bottom: 1px solid #f0f0f0; }
+  .module-list li { padding: .4em 0; }
   .module-list a { color: #336791; text-decoration: none; font-weight: 600; }
   .module-list a:hover { text-decoration: underline; }
   .summary { background: #f8f9fa; border-left: 4px solid #336791;
@@ -271,10 +271,11 @@ def _scan_module_reports(outputdir, info, port, exclude_basenames=()):
     reports exist (e.g. --ai was disabled).
     """
     prefix = _output_prefix(outputdir, info, port)
+    excluded_full = {f"{Path(prefix).name}{n}" for n in exclude_basenames}
     sections = []
     for path in sorted(Path(prefix).parent.glob(
             f"{Path(prefix).name}*.html")):
-        if path.name in exclude_basenames:
+        if path.name in excluded_full:
             continue
         try:
             content = path.read_text(encoding='utf-8')
@@ -284,7 +285,7 @@ def _scan_module_reports(outputdir, info, port, exclude_basenames=()):
             title = html.unescape(m.group(1)).strip()
             verdict = m.group(2).upper()
             raw = _HTML_TAG_RE.sub('', m.group(3))
-            summary = ' '.join(html.unescape(raw).split())[:240]
+            summary = ' '.join(html.unescape(raw).split())
             sections.append({
                 'module_html': path.name,
                 'title': title,
@@ -318,10 +319,8 @@ def write_index_report(output_path, title: str, subtitle: str,
         href = html.escape(f['module_html'])
         ftitle = html.escape(f['title'])
         badge = _verdict_badge(f['verdict'])
-        snippet = html.escape(f['summary'])
         items.append(
-            f'    <li>{badge}<a href="{href}">{ftitle}</a>'
-            f' &mdash; <span class="snippet">{snippet}</span></li>')
+            f'    <li>{badge} <a href="{href}">{ftitle}</a></li>')
     list_html = ('<ul class="module-list">\n'
                  + '\n'.join(items) + '\n  </ul>') if items else (
                      '<p class="missing">No module reports found.</p>')
