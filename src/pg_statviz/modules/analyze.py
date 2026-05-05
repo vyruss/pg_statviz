@@ -25,6 +25,7 @@ from pg_statviz.modules.wait import wait
 from pg_statviz.modules.wal import wal
 from pg_statviz.modules.xact import xact
 from pg_statviz.libs.dbconn import dbconn
+from pg_statviz.libs.html_report import finalize_index_report
 from pg_statviz.libs.info import getinfo
 
 
@@ -64,3 +65,4 @@ def analyze(*, dbname=getpass.getuser(), host="/var/run/postgresql",
         except SystemExit as e:
             _logger.warning(f"{mod.__name__}: {e}")
             continue
+    finalize_index_report(outputdir, info, port, ai)
