@@ -133,6 +133,7 @@ def wal(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                            "and recovery time. No warning threshold. "
                            "Default to [HEALTHY].",
         outfile=outfile,
+        info=info,
     )
 
     # Plot WAL rates
@@ -163,6 +164,7 @@ def wal(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                            "if sustained mean >100 MB/s. Default to "
                            "[HEALTHY].",
         outfile=outfile,
+        info=info,
     )
 
     finalize_module_report(outputdir, info, port, 'wal',

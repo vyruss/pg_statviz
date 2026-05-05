@@ -152,6 +152,7 @@ def lock(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                            "zero. Only concern if sustained high counts (>50) "
                            "or 'AccessExclusive' locks blocking operations.",
         outfile=outfile,
+        info=info,
     )
 
     finalize_module_report(outputdir, info, port, 'lock',

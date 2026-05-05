@@ -44,4 +44,13 @@ def getinfo(conn):
         info['hostname'] = host.decode() if isinstance(host, bytes) else host
         _logger.info(f"""Setting hostname to "{info['hostname']}" """)
         cur.close()
+    cur = conn.cursor()
+    cur.execute("""SELECT current_setting('server_version') AS version,
+                          pg_is_in_recovery() AS in_recovery,
+                          pg_postmaster_start_time() AS started""")
+    row = cur.fetchone()
+    info['pg_version'] = row['version']
+    info['pg_role'] = 'standby' if row['in_recovery'] else 'primary'
+    info['pg_started'] = row['started']
+    cur.close()
     return info

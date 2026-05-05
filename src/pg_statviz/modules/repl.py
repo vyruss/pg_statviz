@@ -196,6 +196,7 @@ def repl(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                                "only if lag sustained >1 GB or slot "
                                "WAL >10 GB. Default to [HEALTHY].",
             outfile=outfile,
+            info=info,
         )
 
     finalize_module_report(outputdir, info, port, 'repl',

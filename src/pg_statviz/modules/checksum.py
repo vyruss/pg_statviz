@@ -122,6 +122,7 @@ def checksum(*, dbname=getpass.getuser(), host="/var/run/postgresql",
                            "bugs, or incomplete writes. Investigate "
                            "immediately with pg_verify_checksums.",
         outfile=outfile,
+        info=info,
     )
 
     finalize_module_report(outputdir, info, port, 'checksum',

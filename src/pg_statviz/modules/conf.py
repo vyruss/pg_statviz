@@ -181,6 +181,7 @@ def conf(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                                    "significantly or if max_connections was "
                                    "lowered.",
                 outfile=outfile,
+                info=info,
             )
 
     finalize_module_report(outputdir, info, port, 'conf',

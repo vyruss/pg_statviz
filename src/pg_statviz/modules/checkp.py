@@ -132,6 +132,7 @@ def checkp(*, dbname=getpass.getuser(), host="/var/run/postgresql",
                                "5: output [HEALTHY]. If mean >= 5: output "
                                "[WARNING].",
             outfile=outfile,
+            info=info,
         )
 
     # Plot WAL rates
@@ -160,6 +161,7 @@ def checkp(*, dbname=getpass.getuser(), host="/var/run/postgresql",
                            "'requested' consistently >20% of 'timed'. "
                            "Isolated tiny blips in 'requested' are normal.",
         outfile=outfile,
+        info=info,
     )
 
     finalize_module_report(outputdir, info, port, 'checkp',

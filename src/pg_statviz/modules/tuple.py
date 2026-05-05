@@ -152,6 +152,7 @@ def tuple(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                            "scans with many filtered rows. No "
                            "warning threshold. Default to [HEALTHY].",
         outfile=outfile,
+        info=info,
     )
 
     # Plot tuple read rates
@@ -198,6 +199,7 @@ def tuple(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                            "faster than autovacuum can clean. No "
                            "warning threshold. Default to [HEALTHY].",
         outfile=outfile,
+        info=info,
     )
 
     finalize_module_report(outputdir, info, port, 'tuple',

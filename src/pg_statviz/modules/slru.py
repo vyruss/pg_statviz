@@ -185,6 +185,7 @@ def slru(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                                    "column mean <95%. Default to "
                                    "[HEALTHY].",
                 outfile=outfile,
+                info=info,
             )
 
     finalize_module_report(outputdir, info, port, 'slru',

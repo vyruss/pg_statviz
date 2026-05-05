@@ -131,6 +131,7 @@ def xact(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                            "concern: rollback ratio >1% of commits, or zero "
                            "activity periods indicating outages.",
         outfile=outfile,
+        info=info,
     )
 
     # Plot transaction rates
@@ -164,6 +165,7 @@ def xact(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                            "exceeds 5% of commit rate (sustained). "
                            "Default to [HEALTHY].",
         outfile=outfile,
+        info=info,
     )
 
     finalize_module_report(outputdir, info, port, 'xact',

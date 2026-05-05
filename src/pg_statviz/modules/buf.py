@@ -133,6 +133,7 @@ def buf(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                            "[HEALTHY]. Checkpoint and bgwriter activity is "
                            "always expected.",
         outfile=outfile,
+        info=info,
     )
 
     # Plot buffer rates
@@ -169,6 +170,7 @@ def buf(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                            ">10% of total rate. Default to "
                            "[HEALTHY].",
         outfile=outfile,
+        info=info,
     )
 
     finalize_module_report(outputdir, info, port, 'buf',

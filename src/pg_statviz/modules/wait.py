@@ -160,6 +160,7 @@ def wait(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                            "if total wait count sustained >50. "
                            "Default to [HEALTHY].",
         outfile=outfile,
+        info=info,
     )
 
     finalize_module_report(outputdir, info, port, 'wait',

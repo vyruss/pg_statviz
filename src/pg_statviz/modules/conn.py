@@ -177,6 +177,7 @@ def conn(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                                "1.0). Warning: only if mean "
                                "idle_in_transaction > 1.0.",
             outfile=outfile,
+            info=info,
         )
 
     # Connection/user count plot
@@ -269,6 +270,7 @@ def conn(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                            "sustained >3600 (1 hour). Default to "
                            "[HEALTHY].",
         outfile=outfile,
+        info=info,
     )
 
     finalize_module_report(outputdir, info, port, 'conn',

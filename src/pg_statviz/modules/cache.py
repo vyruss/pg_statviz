@@ -117,6 +117,7 @@ def cache(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                            "small or working set exceeds RAM. Each cache miss "
                            "= disk I/O latency added to query.",
         outfile=outfile,
+        info=info,
     )
 
     finalize_module_report(outputdir, info, port, 'cache',

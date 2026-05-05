@@ -201,6 +201,7 @@ def io(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                            "intervals are normal. No warning "
                            "threshold. Default to [HEALTHY].",
         outfile=outfile,
+        info=info,
     )
 
     # Build rate DataFrame for AI analysis
@@ -287,6 +288,7 @@ def io(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                            "warning threshold (storage limits vary). "
                            "Default to [HEALTHY].",
         outfile=outfile,
+        info=info,
     )
 
     finalize_module_report(outputdir, info, port, 'io',
