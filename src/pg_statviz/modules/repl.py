@@ -18,7 +18,7 @@ from pg_statviz.libs.ai import (AI_PROVIDERS, DEFAULT_AI_PROVIDER,
                                 run_chart_analysis)
 from pg_statviz.libs.dbconn import dbconn
 from pg_statviz.libs.html_report import finalize_module_report
-from pg_statviz.libs.info import getinfo
+from pg_statviz.libs.info import getinfo, get_settings
 
 
 @arg('-d', '--dbname', help="database name to analyze")
@@ -80,6 +80,8 @@ def repl(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     tstamps = [t['snapshot_tstamp'] for t in data]
     standby_lag = [s['standby_lag'] for s in data]
     slot_stats = [s['slot_stats'] for s in data]
+    settings = get_settings(conn, ['max_wal_senders', 'max_replication_slots',
+                                   'max_wal_size'])
 
     # Build flattened DataFrame for AI analysis
     repl_df = build_repl_dataframe(standby_lag, slot_stats, tstamps)
@@ -197,6 +199,7 @@ def repl(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                                "WAL >10 GB. Default to [HEALTHY].",
             outfile=outfile,
             info=info,
+            settings=settings,
         )
 
     finalize_module_report(outputdir, info, port, 'repl',

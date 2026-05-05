@@ -19,7 +19,7 @@ from pg_statviz.libs.ai import (AI_PROVIDERS, DEFAULT_AI_PROVIDER,
                                 run_chart_analysis)
 from pg_statviz.libs.dbconn import dbconn
 from pg_statviz.libs.html_report import finalize_module_report
-from pg_statviz.libs.info import getinfo
+from pg_statviz.libs.info import getinfo, get_settings
 
 
 @arg('-d', '--dbname', help="database name to analyze")
@@ -78,6 +78,11 @@ def tuple(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
         raise SystemExit("No pg_statviz snapshots found in this database")
 
     tstamps = [t['snapshot_tstamp'] for t in data]
+    settings = get_settings(conn, ['autovacuum', 'autovacuum_naptime',
+                                   'autovacuum_max_workers',
+                                   'autovacuum_work_mem',
+                                   'vacuum_cost_delay',
+                                   'vacuum_cost_limit'])
     returned = [t['tup_returned'] for t in data]
     fetched = [t['tup_fetched'] for t in data]
     inserted = [t['tup_inserted'] for t in data]
@@ -153,6 +158,7 @@ def tuple(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                            "warning threshold. Default to [HEALTHY].",
         outfile=outfile,
         info=info,
+        settings=settings,
     )
 
     # Plot tuple read rates
@@ -200,6 +206,7 @@ def tuple(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                            "warning threshold. Default to [HEALTHY].",
         outfile=outfile,
         info=info,
+        settings=settings,
     )
 
     finalize_module_report(outputdir, info, port, 'tuple',

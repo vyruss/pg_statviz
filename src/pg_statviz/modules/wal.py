@@ -20,7 +20,7 @@ from pg_statviz.libs.ai import (AI_PROVIDERS, DEFAULT_AI_PROVIDER,
                                 run_chart_analysis)
 from pg_statviz.libs.dbconn import dbconn
 from pg_statviz.libs.html_report import finalize_module_report
-from pg_statviz.libs.info import getinfo
+from pg_statviz.libs.info import getinfo, get_settings
 
 
 @arg('-d', '--dbname', help="database name to analyze")
@@ -90,6 +90,8 @@ def wal(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     tstamps = [t['snapshot_tstamp'] for t in data]
     walgb = calc_wal(data)
     walrates = calc_walrates(data)
+    settings = get_settings(conn, ['max_wal_size', 'max_wal_senders',
+                                   'max_replication_slots'])
 
     # Downsample if needed
     walgb_frame = DataFrame(data=walgb, index=tstamps, copy=False)
@@ -134,6 +136,7 @@ def wal(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                            "Default to [HEALTHY].",
         outfile=outfile,
         info=info,
+        settings=settings,
     )
 
     # Plot WAL rates
@@ -165,6 +168,7 @@ def wal(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                            "[HEALTHY].",
         outfile=outfile,
         info=info,
+        settings=settings,
     )
 
     finalize_module_report(outputdir, info, port, 'wal',

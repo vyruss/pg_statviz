@@ -54,3 +54,24 @@ def getinfo(conn):
     info['pg_started'] = row['started']
     cur.close()
     return info
+
+
+def get_settings(conn, names):
+    """Return {name: value} for requested GUCs from the most recent
+    pgstatviz.conf snapshot. Names absent from the snapshot are omitted.
+    Returns {} if no snapshot exists or none of the names are present.
+
+    Used by leaf modules to give the LLM the relevant configuration context
+    for the chart it's analysing (e.g. shared_buffers for cache hit ratio,
+    checkpoint_timeout for checkpoint analysis).
+    """
+    cur = conn.cursor()
+    cur.execute("""SELECT conf
+                   FROM pgstatviz.conf
+                   ORDER BY snapshot_tstamp DESC
+                   LIMIT 1""")
+    row = cur.fetchone()
+    cur.close()
+    if not row or not row['conf']:
+        return {}
+    return {n: row['conf'][n] for n in names if n in row['conf']}

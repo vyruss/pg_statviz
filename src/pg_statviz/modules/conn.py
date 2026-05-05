@@ -19,7 +19,7 @@ from pg_statviz.libs.ai import (AI_PROVIDERS, DEFAULT_AI_PROVIDER,
                                 run_chart_analysis)
 from pg_statviz.libs.dbconn import dbconn
 from pg_statviz.libs.html_report import finalize_module_report
-from pg_statviz.libs.info import getinfo
+from pg_statviz.libs.info import getinfo, get_settings
 
 
 @arg('-d', '--dbname', help="database name to analyze")
@@ -83,6 +83,7 @@ def conn(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
         raise SystemExit("No pg_statviz snapshots found in this database")
 
     tstamps = [t['snapshot_tstamp'] for t in data]
+    settings = get_settings(conn, ['max_connections'])
     total = [c['conn_total'] for c in data]
     ca = [c['conn_active'] for c in data]
     ci = [c['conn_idle'] for c in data]
@@ -178,6 +179,7 @@ def conn(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                                "idle_in_transaction > 1.0.",
             outfile=outfile,
             info=info,
+            settings=settings,
         )
 
     # Connection/user count plot
@@ -271,6 +273,7 @@ def conn(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                            "[HEALTHY].",
         outfile=outfile,
         info=info,
+        settings=settings,
     )
 
     finalize_module_report(outputdir, info, port, 'conn',

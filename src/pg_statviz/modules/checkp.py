@@ -20,7 +20,7 @@ from pg_statviz.libs.ai import (AI_PROVIDERS, DEFAULT_AI_PROVIDER,
                                 run_chart_analysis)
 from pg_statviz.libs.dbconn import dbconn
 from pg_statviz.libs.html_report import finalize_module_report
-from pg_statviz.libs.info import getinfo
+from pg_statviz.libs.info import getinfo, get_settings
 
 
 @arg('-d', '--dbname', help="database name to analyze")
@@ -82,6 +82,9 @@ def checkp(*, dbname=getpass.getuser(), host="/var/run/postgresql",
     tstamps = [t['snapshot_tstamp'] for t in data]
     checkps = calc_checkps(data)
     checkprates = calc_checkprates(data)
+    settings = get_settings(conn, ['checkpoint_timeout',
+                                   'checkpoint_completion_target',
+                                   'max_wal_size'])
 
     # Downsample if needed
     checkps_frame = DataFrame(data=checkps, index=tstamps, copy=False)
@@ -133,6 +136,7 @@ def checkp(*, dbname=getpass.getuser(), host="/var/run/postgresql",
                                "[WARNING].",
             outfile=outfile,
             info=info,
+            settings=settings,
         )
 
     # Plot WAL rates
@@ -162,6 +166,7 @@ def checkp(*, dbname=getpass.getuser(), host="/var/run/postgresql",
                            "Isolated tiny blips in 'requested' are normal.",
         outfile=outfile,
         info=info,
+        settings=settings,
     )
 
     finalize_module_report(outputdir, info, port, 'checkp',

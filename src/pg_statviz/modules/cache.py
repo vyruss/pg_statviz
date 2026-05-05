@@ -17,7 +17,7 @@ from pg_statviz.libs.ai import (AI_PROVIDERS, DEFAULT_AI_PROVIDER,
                                 run_chart_analysis)
 from pg_statviz.libs.dbconn import dbconn
 from pg_statviz.libs.html_report import finalize_module_report
-from pg_statviz.libs.info import getinfo
+from pg_statviz.libs.info import getinfo, get_settings
 
 from pandas import DataFrame
 
@@ -78,6 +78,7 @@ def cache(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
 
     tstamps = [t['snapshot_tstamp'] for t in data]
     ratio = calc_ratio(data)
+    settings = get_settings(conn, ['shared_buffers'])
 
     # Downsample if needed
     ratio_frame = DataFrame(data=ratio, index=tstamps, copy=False)
@@ -118,6 +119,7 @@ def cache(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                            "= disk I/O latency added to query.",
         outfile=outfile,
         info=info,
+        settings=settings,
     )
 
     finalize_module_report(outputdir, info, port, 'cache',

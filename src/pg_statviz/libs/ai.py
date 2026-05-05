@@ -173,8 +173,22 @@ def _build_context_block(info: dict | None) -> str:
     return "### Server context\n" + "\n".join(parts) + "\n\n"
 
 
+def _build_settings_block(settings: dict | None) -> str:
+    """Render the optional 'current PostgreSQL settings' block.
+
+    Modules pass a small dict of GUC name -> value pairs relevant to
+    the chart so the LLM can ground its advice in the actual config.
+    """
+    if not settings:
+        return ""
+    lines = [f"  {n} = {v}" for n, v in settings.items()]
+    return ("### Current PostgreSQL settings\n<user_data>\n"
+            + "\n".join(lines) + "\n</user_data>\n\n")
+
+
 def _build_user_text(module_name: str, metric_description: str,
-                     df: pd.DataFrame, info: dict | None = None) -> str:
+                     df: pd.DataFrame, info: dict | None = None,
+                     settings: dict | None = None) -> str:
     """Build the textual half of the prompt (data summary + trend)."""
     numeric_df = df.select_dtypes(include=['number'])
     if not numeric_df.empty:
@@ -198,7 +212,8 @@ def _build_user_text(module_name: str, metric_description: str,
             pass
     trend_summary = "\n".join(trend_info) if trend_info else "N/A"
 
-    return f"""{_build_context_block(info)}### Module
+    context = _build_context_block(info) + _build_settings_block(settings)
+    return f"""{context}### Module
 {module_name}
 
 ### Metric Context
@@ -264,7 +279,8 @@ def _log_provider_error(label: str, env_var_hint: str, e: Exception) -> None:
 
 def _analyze_claude(df: pd.DataFrame, module_name: str,
                     metric_description: str,
-                    image_paths, info: dict | None = None) -> str | None:
+                    image_paths, info: dict | None = None,
+                    settings: dict | None = None) -> str | None:
     """Run analysis via the Anthropic Claude API."""
     if not ANTHROPIC_AVAILABLE:
         _logger.warning("anthropic package not installed."
@@ -275,7 +291,8 @@ def _analyze_claude(df: pd.DataFrame, module_name: str,
                       + ANTHROPIC_INSTALL_GUIDE)
         return None
 
-    user_text = _build_user_text(module_name, metric_description, df, info)
+    user_text = _build_user_text(module_name, metric_description, df,
+                                 info, settings)
 
     # Images first then text: Claude weights later content more strongly and
     # we want the textual instructions to lead the analysis.
@@ -315,7 +332,8 @@ def _analyze_claude(df: pd.DataFrame, module_name: str,
 
 def _analyze_gemini(df: pd.DataFrame, module_name: str,
                     metric_description: str,
-                    image_paths, info: dict | None = None) -> str | None:
+                    image_paths, info: dict | None = None,
+                    settings: dict | None = None) -> str | None:
     """Run analysis via the Google Gemini API (AI Studio free tier)."""
     if not GOOGLE_GENAI_AVAILABLE:
         _logger.warning("google-genai package not installed."
@@ -328,7 +346,8 @@ def _analyze_gemini(df: pd.DataFrame, module_name: str,
                       + GEMINI_INSTALL_GUIDE)
         return None
 
-    user_text = _build_user_text(module_name, metric_description, df, info)
+    user_text = _build_user_text(module_name, metric_description, df,
+                                 info, settings)
     # Same content ordering rationale as Claude: images then text.
     parts = [google_genai_types.Part.from_bytes(data=img,
                                                 mime_type='image/png')
@@ -353,7 +372,8 @@ def _analyze_gemini(df: pd.DataFrame, module_name: str,
 
 def _analyze_local(df: pd.DataFrame, module_name: str,
                    metric_description: str,
-                   image_paths, info: dict | None = None) -> str | None:
+                   image_paths, info: dict | None = None,
+                   settings: dict | None = None) -> str | None:
     """Run analysis via local Ollama with a vision-capable model."""
     if not OLLAMA_AVAILABLE:
         _logger.warning("ollama package not installed." + OLLAMA_INSTALL_GUIDE)
@@ -362,7 +382,7 @@ def _analyze_local(df: pd.DataFrame, module_name: str,
     # Ollama takes a single-string prompt + a separate `images` field rather
     # than Anthropic-style content blocks, so concatenate system + user.
     prompt = SYSTEM_PROMPT + "\n\n" + _build_user_text(
-        module_name, metric_description, df, info)
+        module_name, metric_description, df, info, settings)
     # The SDK accepts file paths directly and base64-encodes them internally.
     valid_images = [str(p) for p in (image_paths or []) if Path(p).is_file()]
 
@@ -426,7 +446,8 @@ def analyze_stats(df: pd.DataFrame, module_name: str,
                   metric_description: str = "",
                   image_paths=None,
                   mode: str = DEFAULT_AI_PROVIDER,
-                  info: dict | None = None) -> str | None:
+                  info: dict | None = None,
+                  settings: dict | None = None) -> str | None:
     """
     Analyze DataFrame statistics (and optional chart images) with an LLM.
 
@@ -438,6 +459,7 @@ def analyze_stats(df: pd.DataFrame, module_name: str,
         mode: Provider key -- one of AI_PROVIDERS.
         info: Optional host/PG context dict (hostname, pg_version, ...) --
             rendered into the prompt so the LLM can tailor its advice.
+        settings: Optional {guc: value} dict of relevant PostgreSQL settings.
 
     Returns the LLM's markdown response, or None on any failure.
     Never raises -- every error path returns None and logs a clear message.
@@ -455,7 +477,7 @@ def analyze_stats(df: pd.DataFrame, module_name: str,
                  f"for {module_name}...")
     try:
         return provider['fn'](df, module_name, metric_description,
-                              image_paths, info)
+                              image_paths, info, settings)
     except Exception as e:
         # Defence in depth: each adapter already catches; this guarantees the
         # return-None contract holds even if a future adapter forgets to.
@@ -465,7 +487,8 @@ def analyze_stats(df: pd.DataFrame, module_name: str,
 
 def run_chart_analysis(report_sections: list, ai, df: pd.DataFrame,
                        title: str, metric_description: str,
-                       outfile: str, info: dict | None = None) -> None:
+                       outfile: str, info: dict | None = None,
+                       settings: dict | None = None) -> None:
     """Run the AI analysis for one chart and append a section dict to
     report_sections. No-op when ai is None.
 
@@ -482,11 +505,13 @@ def run_chart_analysis(report_sections: list, ai, df: pd.DataFrame,
         outfile: Absolute path of the saved PNG (basename is embedded in the
             HTML as <img src="..."> so the report loads it from the same dir).
         info: Optional host/PG context dict, forwarded to the LLM prompt.
+        settings: Optional {guc: value} dict of relevant PostgreSQL settings.
     """
     if not ai:
         return
     md = analyze_stats(df, title, metric_description,
-                       image_paths=[outfile], mode=ai, info=info)
+                       image_paths=[outfile], mode=ai, info=info,
+                       settings=settings)
     report_sections.append({
         'title': title,
         'image_basename': os.path.basename(outfile),
