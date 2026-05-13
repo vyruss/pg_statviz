@@ -14,8 +14,11 @@ from dateutil.parser import isoparse
 from matplotlib.pyplot import close as mpclose
 from pandas import DataFrame
 from pg_statviz.libs import plot
+from pg_statviz.libs.ai import (AI_PROVIDERS, DEFAULT_AI_PROVIDER,
+                                run_chart_analysis)
 from pg_statviz.libs.dbconn import dbconn
-from pg_statviz.libs.info import getinfo
+from pg_statviz.libs.html_report import finalize_module_report
+from pg_statviz.libs.info import getinfo, get_settings
 
 
 @arg('-d', '--dbname', help="database name to analyze")
@@ -29,11 +32,16 @@ from pg_statviz.libs.info import getinfo
      help="date range to be analyzed in ISO 8601 format e.g. 2026-01-01T00:00"
           + " 2026-01-01T23:59")
 @arg('-O', '--outputdir', help="output directory")
+@arg('-A', '--ai', nargs='?', const=DEFAULT_AI_PROVIDER, default=None,
+     choices=AI_PROVIDERS, metavar='PROVIDER',
+     help="enable AI analysis (default provider: " + DEFAULT_AI_PROVIDER
+          + "). Choices: claude (Anthropic), gemini (Google AI Studio), "
+            "local (Ollama vision model).")
 @arg('--info', help=argparse.SUPPRESS)
 @arg('--conn', help=argparse.SUPPRESS)
 def repl(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
-         username=getpass.getuser(), password=False, daterange=[],
-         outputdir=None, info=None, conn=None):
+         username=getpass.getuser(), password=None, daterange=[],
+         outputdir=None, ai=None, info=None, conn=None):
     "run replication analysis module"
 
     logging.basicConfig()
@@ -72,6 +80,13 @@ def repl(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     tstamps = [t['snapshot_tstamp'] for t in data]
     standby_lag = [s['standby_lag'] for s in data]
     slot_stats = [s['slot_stats'] for s in data]
+    settings = get_settings(conn, ['max_wal_senders', 'max_replication_slots',
+                                   'max_wal_size'])
+
+    # Build flattened DataFrame for AI analysis
+    repl_df = build_repl_dataframe(standby_lag, slot_stats, tstamps)
+
+    report_sections = []
 
     # Plot standby lag and slot WAL retention
     plt, fig, splt1, splt2 = plot.setupdouble()
@@ -172,4 +187,82 @@ def repl(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                             .replace("/", "-")}_{port}_repl.png"""
     _logger.info(f"Saving {outfile}")
     plt.savefig(outfile)
+    if ai and not repl_df.empty:
+        run_chart_analysis(
+            report_sections, ai, repl_df, "Replication",
+            metric_description="Replication lag and slot WAL retention "
+                               "in bytes (point-in-time). Growing lag "
+                               "means standby can't keep up. High "
+                               "slot WAL retention risks WAL "
+                               "wraparound if consumer is down. Warn "
+                               "only if lag sustained >1 GB or slot "
+                               "WAL >10 GB. Default to [HEALTHY].",
+            outfile=outfile,
+            info=info,
+            settings=settings,
+        )
+
+    finalize_module_report(outputdir, info, port, 'repl',
+                           report_sections)
     mpclose('all')
+
+
+# Build a flattened DataFrame from replication stats for AI analysis
+def build_repl_dataframe(standby_lag, slot_stats, tstamps):
+    data = {}
+
+    # Determine all standbys
+    standbys = []
+    for sl in standby_lag:
+        if sl:
+            for s in sl:
+                if s['application_name'] not in standbys:
+                    standbys.append(s['application_name'])
+
+    # Build lag columns
+    for sb in standbys:
+        lag_bytes = []
+        for sl in standby_lag:
+            if not sl:
+                lag_bytes.append(0)
+            else:
+                found = False
+                for s in sl:
+                    if s['application_name'] == sb:
+                        lag_bytes.append(s['lag_bytes']
+                                         if s['lag_bytes'] is not None else 0)
+                        found = True
+                        break
+                if not found:
+                    lag_bytes.append(0)
+        if not all(v == 0 for v in lag_bytes):
+            data[f"{sb}_lag_bytes"] = lag_bytes
+
+    # Determine all slots
+    slots = []
+    for ss in slot_stats:
+        if ss:
+            for s in ss:
+                if s['slot_name'] not in slots:
+                    slots.append(s['slot_name'])
+
+    # Build slot WAL columns
+    for slot in slots:
+        wal_bytes = []
+        for ss in slot_stats:
+            if not ss:
+                wal_bytes.append(0)
+            else:
+                found = False
+                for s in ss:
+                    if s['slot_name'] == slot:
+                        wal_bytes.append(s['wal_bytes']
+                                         if s['wal_bytes'] is not None else 0)
+                        found = True
+                        break
+                if not found:
+                    wal_bytes.append(0)
+        if not all(v == 0 for v in wal_bytes):
+            data[f"{slot}_wal_bytes"] = wal_bytes
+
+    return DataFrame(data=data, index=tstamps, copy=False)

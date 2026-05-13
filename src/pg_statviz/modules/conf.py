@@ -13,7 +13,10 @@ from argh.decorators import arg
 from dateutil.parser import isoparse
 from matplotlib.pyplot import close as mpclose
 from pg_statviz.libs import plot
+from pg_statviz.libs.ai import (AI_PROVIDERS, DEFAULT_AI_PROVIDER,
+                                run_chart_analysis)
 from pg_statviz.libs.dbconn import dbconn
+from pg_statviz.libs.html_report import finalize_module_report
 from pg_statviz.libs.info import getinfo
 
 
@@ -43,11 +46,16 @@ def get_config_diff(prev_conf, curr_conf):
      help="date range to be analyzed in ISO 8601 format e.g. 2026-01-01T00:00"
           + " 2026-01-01T23:59")
 @arg('-O', '--outputdir', help="output directory")
+@arg('-A', '--ai', nargs='?', const=DEFAULT_AI_PROVIDER, default=None,
+     choices=AI_PROVIDERS, metavar='PROVIDER',
+     help="enable AI analysis (default provider: " + DEFAULT_AI_PROVIDER
+          + "). Choices: claude (Anthropic), gemini (Google AI Studio), "
+            "local (Ollama vision model).")
 @arg('--info', help=argparse.SUPPRESS)
 @arg('--conn', help=argparse.SUPPRESS)
 def conf(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
-         username=getpass.getuser(), password=False, daterange=[],
-         outputdir=None, info=None, conn=None):
+         username=getpass.getuser(), password=None, daterange=[],
+         outputdir=None, ai=None, info=None, conn=None):
     "run configuration changes analysis module"
 
     logging.basicConfig()
@@ -147,4 +155,35 @@ def conf(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                             .replace("/", "-")}_{port}_conf.png"""
     _logger.info(f"Saving {outfile}")
     plt.savefig(outfile)
+
+    report_sections = []
+    if ai:
+        # Build a simple DataFrame from changes for AI analysis
+        from pandas import DataFrame
+        changes_data = []
+        for change in changes:
+            for param, vals in change['diff'].items():
+                changes_data.append({
+                    'timestamp': change['timestamp'],
+                    'parameter': param,
+                    'old_value': vals['old'],
+                    'new_value': vals['new']
+                })
+        if changes_data:
+            df = DataFrame(changes_data)
+            run_chart_analysis(
+                report_sections, ai, df, "Configuration Changes",
+                metric_description="PostgreSQL configuration changelog. "
+                                   "Summarize what changed and when. Note: "
+                                   "shared_buffers and max_connections "
+                                   "require restart. Warn if memory settings "
+                                   "(shared_buffers, work_mem) were reduced "
+                                   "significantly or if max_connections was "
+                                   "lowered.",
+                outfile=outfile,
+                info=info,
+            )
+
+    finalize_module_report(outputdir, info, port, 'conf',
+                           report_sections)
     mpclose('all')

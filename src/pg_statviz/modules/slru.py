@@ -14,7 +14,10 @@ from dateutil.parser import isoparse
 from matplotlib.pyplot import close as mpclose
 from pandas import DataFrame
 from pg_statviz.libs import plot
+from pg_statviz.libs.ai import (AI_PROVIDERS, DEFAULT_AI_PROVIDER,
+                                run_chart_analysis)
 from pg_statviz.libs.dbconn import dbconn
+from pg_statviz.libs.html_report import finalize_module_report
 from pg_statviz.libs.info import getinfo
 
 
@@ -29,11 +32,16 @@ from pg_statviz.libs.info import getinfo
      help="date range to be analyzed in ISO 8601 format e.g. 2026-01-01T00:00"
           + " 2026-01-01T23:59")
 @arg('-O', '--outputdir', help="output directory")
+@arg('-A', '--ai', nargs='?', const=DEFAULT_AI_PROVIDER, default=None,
+     choices=AI_PROVIDERS, metavar='PROVIDER',
+     help="enable AI analysis (default provider: " + DEFAULT_AI_PROVIDER
+          + "). Choices: claude (Anthropic), gemini (Google AI Studio), "
+            "local (Ollama vision model).")
 @arg('--info', help=argparse.SUPPRESS)
 @arg('--conn', help=argparse.SUPPRESS)
 def slru(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
-         username=getpass.getuser(), password=False, daterange=[],
-         outputdir=None, info=None, conn=None):
+         username=getpass.getuser(), password=None, daterange=[],
+         outputdir=None, ai=None, info=None, conn=None):
     "run SLRU analysis module"
 
     logging.basicConfig()
@@ -162,4 +170,58 @@ def slru(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                             .replace("/", "-")}_{port}_slru.png"""
     _logger.info(f"Saving {outfile}")
     plt.savefig(outfile)
+
+    report_sections = []
+    if ai:
+        # Build flattened DataFrame for AI analysis
+        slru_df = build_slru_dataframe(slru_stats, slru_names, tstamps)
+        if not slru_df.empty:
+            run_chart_analysis(
+                report_sections, ai, slru_df, "SLRU",
+                metric_description="SLRU cache statistics. *_blks_read "
+                                   "columns are CUMULATIVE COUNTERS — "
+                                   "rising values are NORMAL, IGNORE "
+                                   "them. Warn only if any *_hit_ratio "
+                                   "column mean <95%. Default to "
+                                   "[HEALTHY].",
+                outfile=outfile,
+                info=info,
+            )
+
+    finalize_module_report(outputdir, info, port, 'slru',
+                           report_sections)
     mpclose('all')
+
+
+# Build a flattened DataFrame from SLRU stats for AI analysis
+def build_slru_dataframe(slru_stats, slru_names, tstamps):
+    data = {}
+
+    for name in slru_names:
+        hit_ratios = []
+        reads = []
+        for ss in slru_stats:
+            if not ss:
+                hit_ratios.append(0)
+                reads.append(0)
+            else:
+                found = False
+                for s in ss:
+                    if s['name'] == name:
+                        total = s['blks_hit'] + s['blks_read']
+                        if total > 0:
+                            hit_ratios.append((s['blks_hit'] / total) * 100)
+                        else:
+                            hit_ratios.append(0)
+                        reads.append(s['blks_read'])
+                        found = True
+                        break
+                if not found:
+                    hit_ratios.append(0)
+                    reads.append(0)
+        if not all(v == 0 for v in hit_ratios):
+            data[f"{name}_hit_ratio"] = hit_ratios
+        if not all(v == 0 for v in reads):
+            data[f"{name}_blks_read"] = reads
+
+    return DataFrame(data=data, index=tstamps, copy=False)

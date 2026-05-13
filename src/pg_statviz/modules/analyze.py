@@ -7,7 +7,9 @@ __copyright__ = "Copyright (c) 2026 Jimmy Angelakos"
 __license__ = "PostgreSQL License"
 
 import getpass
+import logging
 from argh.decorators import arg
+from pg_statviz.libs.ai import AI_PROVIDERS, DEFAULT_AI_PROVIDER
 from pg_statviz.modules.buf import buf
 from pg_statviz.modules.cache import cache
 from pg_statviz.modules.checkp import checkp
@@ -23,6 +25,7 @@ from pg_statviz.modules.wait import wait
 from pg_statviz.modules.wal import wal
 from pg_statviz.modules.xact import xact
 from pg_statviz.libs.dbconn import dbconn
+from pg_statviz.libs.html_report import finalize_index_report
 from pg_statviz.libs.info import getinfo
 
 
@@ -37,9 +40,14 @@ from pg_statviz.libs.info import getinfo
      help="date range to be analyzed in ISO 8601 format e.g. 2026-01-01T00:00 "
           + "2026-01-01T23:59")
 @arg('-O', '--outputdir', help="output directory")
+@arg('-A', '--ai', nargs='?', const=DEFAULT_AI_PROVIDER, default=None,
+     choices=AI_PROVIDERS, metavar='PROVIDER',
+     help="enable AI analysis (default provider: " + DEFAULT_AI_PROVIDER
+          + "). Choices: claude (Anthropic), gemini (Google AI Studio), "
+            "local (Ollama vision model).")
 def analyze(*, dbname=getpass.getuser(), host="/var/run/postgresql",
-            port="5432", username=getpass.getuser(), password=False,
-            daterange=[], outputdir=None):
+            port="5432", username=getpass.getuser(), password=None,
+            daterange=[], outputdir=None, ai=None):
     "run all analysis modules"
 
     conn_details = {'dbname': dbname, 'user': username,
@@ -47,17 +55,14 @@ def analyze(*, dbname=getpass.getuser(), host="/var/run/postgresql",
                     else password, 'host': host, 'port': port}
     connx = dbconn(**conn_details)
     info = getinfo(connx)
-    buf(daterange=daterange, outputdir=outputdir, info=info, conn=connx)
-    checkp(daterange=daterange, outputdir=outputdir, info=info, conn=connx)
-    cache(daterange=daterange, outputdir=outputdir, info=info, conn=connx)
-    checksum(daterange=daterange, outputdir=outputdir, info=info, conn=connx)
-    conf(daterange=daterange, outputdir=outputdir, info=info, conn=connx)
-    conn(daterange=daterange, outputdir=outputdir, info=info, conn=connx)
-    io(daterange=daterange, outputdir=outputdir, info=info, conn=connx)
-    lock(daterange=daterange, outputdir=outputdir, info=info, conn=connx)
-    repl(daterange=daterange, outputdir=outputdir, info=info, conn=connx)
-    slru(daterange=daterange, outputdir=outputdir, info=info, conn=connx)
-    tuple(daterange=daterange, outputdir=outputdir, info=info, conn=connx)
-    wait(daterange=daterange, outputdir=outputdir, info=info, conn=connx)
-    wal(daterange=daterange, outputdir=outputdir, info=info, conn=connx)
-    xact(daterange=daterange, outputdir=outputdir, info=info, conn=connx)
+    _logger = logging.getLogger(__name__)
+    common = dict(daterange=daterange, outputdir=outputdir, ai=ai,
+                  info=info, conn=connx)
+    for mod in (buf, checkp, cache, checksum, conf, conn, io,
+                lock, repl, slru, tuple, wait, wal, xact):
+        try:
+            mod(**common)
+        except SystemExit as e:
+            _logger.warning(f"{mod.__name__}: {e}")
+            continue
+    finalize_index_report(outputdir, info, port, ai)

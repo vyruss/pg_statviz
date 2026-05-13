@@ -15,8 +15,11 @@ from matplotlib.pyplot import close as mpclose
 from matplotlib.ticker import MaxNLocator
 from pandas import DataFrame
 from pg_statviz.libs import plot
+from pg_statviz.libs.ai import (AI_PROVIDERS, DEFAULT_AI_PROVIDER,
+                                run_chart_analysis)
 from pg_statviz.libs.dbconn import dbconn
-from pg_statviz.libs.info import getinfo
+from pg_statviz.libs.html_report import finalize_module_report
+from pg_statviz.libs.info import getinfo, get_settings
 
 
 @arg('-d', '--dbname', help="database name to analyze")
@@ -30,13 +33,18 @@ from pg_statviz.libs.info import getinfo
      help="date range to be analyzed in ISO 8601 format e.g. 2026-01-01T00:00"
           + " 2026-01-01T23:59")
 @arg('-O', '--outputdir', help="output directory")
+@arg('-A', '--ai', nargs='?', const=DEFAULT_AI_PROVIDER, default=None,
+     choices=AI_PROVIDERS, metavar='PROVIDER',
+     help="enable AI analysis (default provider: " + DEFAULT_AI_PROVIDER
+          + "). Choices: claude (Anthropic), gemini (Google AI Studio), "
+            "local (Ollama vision model).")
 @arg('--info', help=argparse.SUPPRESS)
 @arg('--conn', help=argparse.SUPPRESS)
 @arg('-u', '--users', help="user name(s) to plot in analysis",
      nargs='*', type=str)
 def conn(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
-         username=getpass.getuser(), password=False, daterange=[],
-         outputdir=None, info=None, conn=None, users=[]):
+         username=getpass.getuser(), password=None, daterange=[],
+         outputdir=None, ai=None, info=None, conn=None, users=[]):
     "run connection count analysis module"
 
     logging.basicConfig()
@@ -75,6 +83,7 @@ def conn(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
         raise SystemExit("No pg_statviz snapshots found in this database")
 
     tstamps = [t['snapshot_tstamp'] for t in data]
+    settings = get_settings(conn, ['max_connections'])
     total = [c['conn_total'] for c in data]
     ca = [c['conn_active'] for c in data]
     ci = [c['conn_idle'] for c in data]
@@ -114,6 +123,8 @@ def conn(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                 if c['user'] not in users:
                     users += c['user'],
 
+    report_sections = []
+
     # Connection/status count plot
     plt, fig = plot.setup()
     plt.suptitle(f"pg_statviz · {info['hostname']}:{port}",
@@ -152,6 +163,24 @@ def conn(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                             .replace("/", "-")}_{port}_conn_status.png"""
     _logger.info(f"Saving {outfile}")
     plt.savefig(outfile)
+    if ai:
+        # Only pass idle_in_transaction columns - those determine health status
+        ai_df = r[['cit', 'cita']].rename(columns={
+            'cit': 'idle_in_transaction',
+            'cita': 'idle_in_transaction_aborted'
+        })
+        run_chart_analysis(
+            report_sections, ai, ai_df, "Connection Status",
+            metric_description="Idle-in-transaction connection counts "
+                               "(point-in-time). These connections hold locks "
+                               "and block vacuum from cleaning dead tuples. "
+                               "Healthy: values are zero or near-zero (mean < "
+                               "1.0). Warning: only if mean "
+                               "idle_in_transaction > 1.0.",
+            outfile=outfile,
+            info=info,
+            settings=settings,
+        )
 
     # Connection/user count plot
     plt, fig = plot.setup()
@@ -191,12 +220,9 @@ def conn(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                             .replace("/", "-")}_{port}_conn_user.png"""
     _logger.info(f"Saving {outfile}")
     plt.savefig(outfile)
+    # Note: conn_user uses dynamic per-user DataFrames, skip AI here
 
     # Session activity age plot
-    plt, fig = plot.setup()
-    plt.suptitle(f"pg_statviz · {info['hostname']}:{port}",
-                 fontweight='semibold')
-    plt.title('Session activity age')
     # Downsample if needed
     age_frame = DataFrame(
         data={'max_query_age': max_query_age,
@@ -209,6 +235,11 @@ def conn(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
         ra = age_frame.resample(q + "s").max()
     else:
         ra = age_frame
+
+    plt, fig = plot.setup()
+    plt.suptitle(f"pg_statviz · {info['hostname']}:{port}",
+                 fontweight='semibold')
+    plt.title('Session activity age')
     if not all(c == 0 for c in ra['max_query_age']):
         plt.plot_date(ra.index, ra['max_query_age'],
                       label='max query age', aa=True, linestyle='solid')
@@ -229,4 +260,40 @@ def conn(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                             .replace("/", "-")}_{port}_conn_age.png"""
     _logger.info(f"Saving {outfile}")
     plt.savefig(outfile)
+    age_findings = []
+    max_q = max(max_query_age) if max_query_age else 0
+    max_x = max(max_xact_age) if max_xact_age else 0
+    if max_q > 7200 or max_x > 7200:
+        age_findings.append({
+            'severity': 'CRITICAL',
+            'message': f'max_query_age peak {max_q}s, '
+                       f'max_xact_age peak {max_x}s '
+                       f'(threshold 7200s for CRITICAL)',
+        })
+    elif max_q > 3600 or max_x > 3600:
+        age_findings.append({
+            'severity': 'WARNING',
+            'message': f'max_query_age peak {max_q}s, '
+                       f'max_xact_age peak {max_x}s '
+                       f'(threshold 3600s for WARNING)',
+        })
+    run_chart_analysis(
+        report_sections, ai, ra, "Session Activity Age",
+        metric_description="Session ages in seconds (point-in-time). "
+                           "Long-running queries block autovacuum. "
+                           "Old transactions prevent dead tuple "
+                           "cleanup causing bloat. IGNORE "
+                           "max_backend_age — long-lived backends "
+                           "are normal with connection pools. Warn "
+                           "only if max_query_age or max_xact_age "
+                           "sustained >3600 (1 hour). Default to "
+                           "[HEALTHY].",
+        outfile=outfile,
+        info=info,
+        settings=settings,
+        findings=age_findings,
+    )
+
+    finalize_module_report(outputdir, info, port, 'conn',
+                           report_sections)
     mpclose('all')
