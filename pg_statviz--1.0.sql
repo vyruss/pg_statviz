@@ -4,7 +4,7 @@
 // Copyright (c) 2026 Jimmy Angelakos
 // This software is released under the PostgreSQL Licence
 //
-// pg_statviz--0.7 - Release v0.7
+// pg_statviz--0.9 - Release v0.9
 */
 
 -- complain if script is sourced in psql, rather than via CREATE EXTENSION
@@ -114,12 +114,12 @@ CREATE TABLE IF NOT EXISTS @extschema@.conf(
 CREATE OR REPLACE FUNCTION @extschema@.snapshot_conf(snapshot_tstamp timestamptz)
 RETURNS void
 AS $$
-    INSERT INTO @extschema@.conf (
-        snapshot_tstamp,
-        conf)
-    SELECT
-        snapshot_tstamp,
-        jsonb_object_agg("variable", "value")
+DECLARE
+    current_conf jsonb;
+    previous_conf jsonb;
+BEGIN
+    SELECT jsonb_object_agg("variable", "value")
+    INTO current_conf
     FROM (
         SELECT "name" AS "variable",
                "setting" AS "value"
@@ -146,7 +146,17 @@ AS $$
             'shared_buffers',
             'vacuum_cost_delay',
             'vacuum_cost_limit')) s;
-$$ LANGUAGE SQL;
+
+    SELECT c1.conf INTO previous_conf
+    FROM @extschema@.conf c1
+    WHERE c1.snapshot_tstamp = (SELECT MAX(c2.snapshot_tstamp) FROM @extschema@.conf c2);
+
+    IF previous_conf IS NULL OR current_conf IS DISTINCT FROM previous_conf THEN
+        INSERT INTO @extschema@.conf (snapshot_tstamp, conf)
+        VALUES (snapshot_conf.snapshot_tstamp, current_conf);
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
 
 
 -- Connections
@@ -158,7 +168,10 @@ CREATE TABLE IF NOT EXISTS @extschema@.conn(
     conn_idle_trans int,
     conn_idle_trans_abort int,
     conn_fastpath int,
-    conn_users jsonb);
+    conn_users jsonb,
+    max_query_age_seconds double precision,
+    max_xact_age_seconds double precision,
+    max_backend_age_seconds double precision);
 
 CREATE OR REPLACE FUNCTION @extschema@.snapshot_conn(snapshot_tstamp timestamptz)
 RETURNS void
@@ -175,7 +188,14 @@ AS $$
                 SELECT usename AS user, count(*) AS connections
                 FROM pgsa
                 WHERE usename IS NOT NULL
-                GROUP BY usename) uc)
+                GROUP BY usename) uc),
+        maxages AS (
+            SELECT
+                date_part('epoch', max(clock_timestamp() - query_start)) AS max_query_age,
+                date_part('epoch', max(clock_timestamp() - xact_start)) AS max_xact_age,
+                date_part('epoch', max(clock_timestamp() - backend_start)) AS max_backend_age
+            FROM pgsa
+            WHERE state != 'idle')
     INSERT INTO @extschema@.conn (
         snapshot_tstamp,
         conn_total,
@@ -184,7 +204,10 @@ AS $$
         conn_idle_trans,
         conn_idle_trans_abort,
         conn_fastpath,
-        conn_users)
+        conn_users,
+        max_query_age_seconds,
+        max_xact_age_seconds,
+        max_backend_age_seconds)
     SELECT
         snapshot_tstamp,
         count(*) AS conn_total,
@@ -193,7 +216,10 @@ AS $$
         count(*) FILTER (WHERE state = 'idle in transaction') AS conn_idle_trans,
         count(*) FILTER (WHERE state = 'idle in transaction (aborted)') AS conn_idle_trans_abort,
         count(*) FILTER (WHERE state = 'fastpath function call') AS conn_fastpath,
-        (SELECT * from userconns) AS conn_users
+        (SELECT * from userconns) AS conn_users,
+        (SELECT max_query_age FROM maxages),
+        (SELECT max_xact_age FROM maxages),
+        (SELECT max_backend_age FROM maxages)
     FROM pgsa;
 $$ LANGUAGE SQL;
 
@@ -230,6 +256,76 @@ AS $$
         count(*) AS locks_total,
         (SELECT * from lcks) AS locks
     FROM pgl;
+$$ LANGUAGE SQL;
+
+
+-- Replication
+CREATE TABLE IF NOT EXISTS @extschema@.repl(
+    snapshot_tstamp timestamptz REFERENCES @extschema@.snapshots(snapshot_tstamp) ON DELETE CASCADE PRIMARY KEY,
+    standby_lag jsonb,
+    slot_stats jsonb);
+
+CREATE OR REPLACE FUNCTION @extschema@.snapshot_repl(snapshot_tstamp timestamptz)
+RETURNS void
+AS $$
+    WITH
+        standbys AS (
+            SELECT jsonb_agg(jsonb_build_object(
+                'application_name', application_name,
+                'state', state,
+                'sync_state', sync_state,
+                'lag_bytes', pg_wal_lsn_diff(pg_current_wal_lsn(), sent_lsn),
+                'lag_seconds', date_part('epoch', clock_timestamp() - reply_time)
+            )) AS standby_lag
+            FROM pg_stat_replication),
+        slots AS (
+            SELECT jsonb_agg(jsonb_build_object(
+                'slot_name', slot_name,
+                'slot_type', slot_type,
+                'active', active,
+                'wal_bytes', CASE
+                    WHEN pg_is_in_recovery() THEN NULL
+                    ELSE pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)
+                END
+            )) AS slot_stats
+            FROM pg_replication_slots
+            WHERE slot_type = 'physical'
+               OR database = current_database())
+    INSERT INTO @extschema@.repl (
+        snapshot_tstamp,
+        standby_lag,
+        slot_stats)
+    SELECT
+        snapshot_tstamp,
+        (SELECT standby_lag FROM standbys),
+        (SELECT slot_stats FROM slots);
+$$ LANGUAGE SQL;
+
+
+-- SLRU
+CREATE TABLE IF NOT EXISTS @extschema@.slru(
+    snapshot_tstamp timestamptz REFERENCES @extschema@.snapshots(snapshot_tstamp) ON DELETE CASCADE PRIMARY KEY,
+    slru_stats jsonb);
+
+CREATE OR REPLACE FUNCTION @extschema@.snapshot_slru(snapshot_tstamp timestamptz)
+RETURNS void
+AS $$
+    INSERT INTO @extschema@.slru (
+        snapshot_tstamp,
+        slru_stats)
+    SELECT
+        snapshot_tstamp,
+        jsonb_agg(jsonb_build_object(
+            'name', name,
+            'blks_zeroed', blks_zeroed,
+            'blks_hit', blks_hit,
+            'blks_read', blks_read,
+            'blks_written', blks_written,
+            'blks_exists', blks_exists,
+            'flushes', flushes,
+            'truncates', truncates
+        ))
+    FROM pg_stat_slru;
 $$ LANGUAGE SQL;
 
 
@@ -283,7 +379,39 @@ CREATE TABLE IF NOT EXISTS @extschema@.wal(
 -- pg_stat_wal only exists in PG14+
 DO $block$
 BEGIN
-    IF (SELECT current_setting('server_version_num')::int >= 140000) THEN
+    IF (SELECT current_setting('server_version_num')::int >= 180000) THEN
+        -- PG18+ moved wal_write/wal_sync statistics to pg_stat_io (object = 'wal')
+        CREATE OR REPLACE FUNCTION @extschema@.snapshot_wal(snapshot_tstamp timestamptz)
+        RETURNS void
+        AS $$
+            INSERT INTO @extschema@.wal (
+                    snapshot_tstamp,
+                    wal_records,
+                    wal_fpi,
+                    wal_bytes,
+                    wal_buffers_full,
+                    wal_write,
+                    wal_sync,
+                    wal_write_time,
+                    wal_sync_time,
+                    stats_reset)
+                SELECT
+                    snapshot_tstamp,
+                    w.wal_records,
+                    w.wal_fpi,
+                    w.wal_bytes,
+                    w.wal_buffers_full,
+                    SUM(io.writes),
+                    SUM(io.fsyncs),
+                    SUM(io.write_time),
+                    SUM(io.fsync_time),
+                    w.stats_reset
+                FROM pg_stat_wal w, pg_stat_io io
+                WHERE io.object = 'wal'
+                GROUP BY w.wal_records, w.wal_fpi, w.wal_bytes, w.wal_buffers_full, w.stats_reset;
+        $$ LANGUAGE SQL;
+    ELSIF (SELECT current_setting('server_version_num')::int >= 140000) THEN
+        -- PG14-17 has all WAL stats in pg_stat_wal
         CREATE OR REPLACE FUNCTION @extschema@.snapshot_wal(snapshot_tstamp timestamptz)
         RETURNS void
         AS $$
@@ -332,7 +460,9 @@ CREATE TABLE IF NOT EXISTS @extschema@.db(
     temp_bytes bigint,
     block_size int,
     stats_reset timestamptz,
-    postmaster_start_time timestamptz);
+    postmaster_start_time timestamptz,
+    checksum_failures bigint,
+    checksum_last_failure timestamptz);
 
 CREATE OR REPLACE FUNCTION @extschema@.snapshot_db(snapshot_tstamp timestamptz)
 RETURNS void
@@ -352,7 +482,9 @@ AS $$
             temp_bytes,
             stats_reset,
             block_size,
-            postmaster_start_time)
+            postmaster_start_time,
+            checksum_failures,
+            checksum_last_failure)
         SELECT
             snapshot_tstamp,
             xact_commit,
@@ -368,7 +500,9 @@ AS $$
             temp_bytes,
             stats_reset,
             current_setting('block_size')::int,
-            pg_postmaster_start_time()
+            pg_postmaster_start_time(),
+            checksum_failures,
+            checksum_last_failure
         FROM pg_stat_database
         WHERE datname = current_database();
 $$ LANGUAGE SQL;
@@ -383,7 +517,50 @@ CREATE TABLE IF NOT EXISTS @extschema@.io(
 -- pg_stat_io only exists in PG16+
 DO $block$
 BEGIN
-    IF (SELECT current_setting('server_version_num')::int >= 160000) THEN
+    IF (SELECT current_setting('server_version_num')::int >= 180000) THEN
+        -- PG18+ uses byte-based metrics (read_bytes, write_bytes, extend_bytes)
+        CREATE OR REPLACE FUNCTION @extschema@.snapshot_io(snapshot_tstamp timestamptz)
+        RETURNS void
+        AS $$
+            WITH
+                pgsi AS (
+                    SELECT
+                        backend_type,
+                        object,
+                        context,
+                        reads,
+                        read_time,
+                        read_bytes,
+                        writes,
+                        write_time,
+                        write_bytes,
+                        writebacks,
+                        writeback_time,
+                        extends,
+                        extend_time,
+                        extend_bytes,
+                        hits,
+                        evictions,
+                        reuses,
+                        fsyncs,
+                        fsync_time,
+                        stats_reset
+                    FROM pg_stat_io
+                    WHERE NOT (reads = 0 AND writes = 0)),
+                ioagg AS (
+                    SELECT jsonb_agg(io)
+                    FROM (SELECT *
+                          FROM pgsi) io)
+            INSERT INTO @extschema@.io (
+                    snapshot_tstamp,
+                    io_stats,
+                    stats_reset)
+            SELECT snapshot_tstamp,
+                   (SELECT * FROM ioagg) AS io_stats,
+                   (SELECT stats_reset FROM pgsi LIMIT 1) AS stats_reset;
+        $$ LANGUAGE SQL;
+    ELSIF (SELECT current_setting('server_version_num')::int >= 160000) THEN
+        -- PG16-17 uses operation counts without byte metrics
         CREATE OR REPLACE FUNCTION @extschema@.snapshot_io(snapshot_tstamp timestamptz)
         RETURNS void
         AS $$
@@ -444,6 +621,8 @@ AS $$
             PERFORM @extschema@.snapshot_io(ts);
         END IF;
         PERFORM @extschema@.snapshot_lock(ts);
+        PERFORM @extschema@.snapshot_repl(ts);
+        PERFORM @extschema@.snapshot_slru(ts);
         PERFORM @extschema@.snapshot_wait(ts);
         -- pg_stat_wal only exists in PG14+
         IF (SELECT current_setting('server_version_num')::int >= 140000) THEN
@@ -471,6 +650,8 @@ SELECT pg_catalog.pg_extension_config_dump('pgstatviz.conn', '');
 SELECT pg_catalog.pg_extension_config_dump('pgstatviz.db', '');
 SELECT pg_catalog.pg_extension_config_dump('pgstatviz.io', '');
 SELECT pg_catalog.pg_extension_config_dump('pgstatviz.lock', '');
+SELECT pg_catalog.pg_extension_config_dump('pgstatviz.repl', '');
+SELECT pg_catalog.pg_extension_config_dump('pgstatviz.slru', '');
 SELECT pg_catalog.pg_extension_config_dump('pgstatviz.snapshots', '');
 SELECT pg_catalog.pg_extension_config_dump('pgstatviz.wait', '');
 SELECT pg_catalog.pg_extension_config_dump('pgstatviz.wal', '');
