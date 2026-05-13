@@ -7,7 +7,7 @@ requires-python = ">=3.11"
 license = {file = "LICENSE"}
 keywords = ["open-source", "postgres", "opensource", "database", "dataviz", "time-series", "postgresql", "data-visualization", "database-management", "database-administration", "performance-analysis", "postgresql-database", "postgresql-extension", "time-series-analysis"]
 authors = [{name = "Jimmy Angelakos", email = "vyruss@hellug.gr"}]
-classifiers = ["Development Status :: 4 - Beta",
+classifiers = ["Development Status :: 5 - Production/Stable",
                "Programming Language :: Python :: 3",]
 dependencies = ["argh<0.30", "contourpy", "cycler", "fonttools", "kiwisolver", "matplotlib", "numpy", "packaging", "pandas", "Pillow", "psycopg", "pyparsing", "python-dateutil", "six"]
 
