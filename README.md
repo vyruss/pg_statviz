@@ -252,8 +252,9 @@ The visualization utility can be called like a PostgreSQL command line tool:
 
 `pg_statviz` can optionally generate AI-powered analysis of each chart, producing
 per-module HTML reports with embedded chart images and LLM commentary. The AI acts
-as a Senior PostgreSQL DBA, reviewing each chart and providing a **[HEALTHY]** or
-**[WARNING]** verdict with a brief interpretation.
+as a Senior PostgreSQL DBA, reviewing each chart and providing a **[HEALTHY]**,
+**[WARNING]**, or **[CRITICAL]** verdict with a brief interpretation, and a
+concrete remediation step for any [WARNING] or [CRITICAL] finding.
 
 ### Enabling AI analysis
 
@@ -286,7 +287,33 @@ When `--ai` is enabled, each module produces an HTML report alongside the chart
 PNGs (e.g. `pg_statviz_localhost_5432_buf.html`). The report embeds the chart
 images and renders the AI analysis as styled HTML.
 
+When the `analyze` subcommand is invoked with `--ai`, an additional top-level
+`pg_statviz_<host>_<port>_index.html` report is generated. It synthesises the
+per-module verdicts into a single cross-cutting summary, correlating patterns
+across charts and surfacing the single most important next action.
+
 ![AI report sample](src/pg_statviz/libs/pg_statviz_ai_report_sample.png)
+
+### How the analysis is grounded
+
+The AI doesn't just look at the chart data in isolation. Each prompt also
+includes:
+
+- The captured PostgreSQL version and role (primary/standby) and the hostname,
+  so suggestions can be tailored to your actual server.
+- The relevant `pg_settings` snapshot for the chart in question (e.g.
+  `shared_buffers` and `bgwriter_*` for buffer charts, `checkpoint_*` and
+  `max_wal_size` for checkpoint charts), so the advice is grounded in your
+  configuration rather than generic folklore.
+- Per-chart deterministic rule findings computed from the actual numeric data
+  before the LLM call (for example: cache hit ratio below 95%, session age
+  over one hour, any non-zero checksum failure). These are injected into the
+  prompt and a **severity floor** ensures the LLM's final verdict can never
+  be downgraded below the worst rule finding.
+
+User-supplied data (config values, role names, slot names, etc.) is wrapped in
+`<user_data>...</user_data>` envelopes and the system prompt instructs the
+model never to treat that content as instructions.
 
 ## Schema
 
