@@ -85,15 +85,22 @@ def checkp(*, dbname=getpass.getuser(), host="/var/run/postgresql",
     settings = get_settings(conn, ['checkpoint_timeout',
                                    'checkpoint_completion_target',
                                    'max_wal_size'])
-    findings = []
-    req_mean = (sum(checkps['req']) / len(checkps['req'])
-                if checkps.get('req') else 0)
-    if req_mean >= 5:
-        findings.append({
-            'severity': 'WARNING',
-            'message': f'mean requested checkpoints {req_mean:.1f} >= 5 '
-                       f'(WAL filling before checkpoint_timeout)',
-        })
+    # Rate-based rule: only the per-minute rate is meaningful here.
+    # checkps['req'] is a cumulative counter, so its mean is not.
+    rate_findings = []
+    req_rates = [v for v in checkprates['req'] if not numpy.isnan(v)]
+    timed_rates = [v for v in checkprates['timed'] if not numpy.isnan(v)]
+    if req_rates and timed_rates:
+        req_total = sum(req_rates)
+        timed_total = sum(timed_rates)
+        total = req_total + timed_total
+        if total > 0 and (req_total / total) > 0.20:
+            rate_findings.append({
+                'severity': 'WARNING',
+                'message': f'requested checkpoints are '
+                           f'{req_total / total * 100:.0f}% of total '
+                           f'(>20% indicates max_wal_size too small)',
+            })
 
     # Downsample if needed
     checkps_frame = DataFrame(data=checkps, index=tstamps, copy=False)
@@ -132,21 +139,24 @@ def checkp(*, dbname=getpass.getuser(), host="/var/run/postgresql",
     _logger.info(f"Saving {outfile}")
     plt.savefig(outfile)
     if ai:
-        # Only pass requested column - that's what determines health status
+        # Only pass requested column - the cumulative total at the end gives
+        # a sense of scale, but no rule is applied here (rate-based judgement
+        # lives on the Checkpoint Rate chart, which can actually distinguish
+        # WAL pressure from a long observation window).
         ai_df = r[['req']].rename(columns={'req': 'requested_checkpoints'})
         run_chart_analysis(
             report_sections, ai, ai_df, "Checkpoints",
             metric_description="Requested checkpoint count (CUMULATIVE "
-                               "COUNTER - rising values are normal, IGNORE "
-                               "trend). Requested checkpoints indicate WAL "
-                               "filled before checkpoint_timeout. DECISION "
-                               "RULE: Look at the MEAN value only. If mean < "
-                               "5: output [HEALTHY]. If mean >= 5: output "
-                               "[WARNING].",
+                               "COUNTER - rising values are NORMAL, IGNORE "
+                               "growth and slope). Requested checkpoints "
+                               "happen when WAL fills before "
+                               "checkpoint_timeout. Do NOT warn based on the "
+                               "mean of this counter -- judge WAL pressure "
+                               "from the Checkpoint Rate chart instead. "
+                               "Default to [HEALTHY].",
             outfile=outfile,
             info=info,
             settings=settings,
-            findings=findings,
         )
 
     # Plot WAL rates
@@ -177,6 +187,7 @@ def checkp(*, dbname=getpass.getuser(), host="/var/run/postgresql",
         outfile=outfile,
         info=info,
         settings=settings,
+        findings=rate_findings,
     )
 
     finalize_module_report(outputdir, info, port, 'checkp',
