@@ -13,6 +13,8 @@ PostgreSQL performance over time and potentially aiding in performance tuning an
 Optionally, an [AI analysis](#ai-analysis-optional) mode can produce per-module HTML reports
 with chart commentary from a cloud LLM (Claude or Gemini) or a local model via Ollama.
 
+[![Wait events](src/pg_statviz/libs/pg_statviz_srv.example.com_5432_wait.png)](src/pg_statviz/libs/pg_statviz_srv.example.com_5432_wait.png)
+
 ## Design Philosophy
 
 Designed with the [K.I.S.S.](https://en.wikipedia.org/wiki/KISS_principle) and
@@ -237,16 +239,17 @@ The visualization utility can be called like a PostgreSQL command line tool:
 
 ### Example:
 
-    pg_statviz buf --host localhost -d postgres -U postgres -D 2026-01-01T00:00 2026-01-01T23:59
+    pg_statviz buf --host srv.example.com -d postgres -U postgres -D 2025-06-01T00:00 2025-12-31T23:59
 
 ### Produces:
-![buf output sample](src/pg_statviz/libs/pg_statviz_localhost_5432_buf.png)
+[![buf output sample](src/pg_statviz/libs/pg_statviz_srv.example.com_5432_buf.png)](src/pg_statviz/libs/pg_statviz_srv.example.com_5432_buf.png)
 
 [comment]::
 
-![buf output sample (rate)](src/pg_statviz/libs/pg_statviz_localhost_5432_buf_rate.png)
+[![buf output sample (rate)](src/pg_statviz/libs/pg_statviz_srv.example.com_5432_buf_rate.png)](src/pg_statviz/libs/pg_statviz_srv.example.com_5432_buf_rate.png)
 
-![conf output sample](src/pg_statviz/libs/pg_statviz_localhost_5432_conf.png)
+### Configuration changes:
+[![conf output sample](src/pg_statviz/libs/pg_statviz_srv.example.com_5432_conf.png)](src/pg_statviz/libs/pg_statviz_srv.example.com_5432_conf.png)
 
 ## AI Analysis (optional)
 
@@ -292,7 +295,7 @@ When the `analyze` subcommand is invoked with `--ai`, an additional top-level
 per-module verdicts into a single cross-cutting summary, correlating patterns
 across charts and surfacing the single most important next action.
 
-![AI report sample](src/pg_statviz/libs/pg_statviz_ai_report_sample.png)
+[![AI report sample](src/pg_statviz/libs/pg_statviz_ai_report_sample.png)](src/pg_statviz/libs/pg_statviz_ai_report_sample.png)
 
 ### How the analysis is grounded
 

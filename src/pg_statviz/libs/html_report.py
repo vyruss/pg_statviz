@@ -132,7 +132,7 @@ _CSS = """
   section h2 { color: #336791; font-size: 1.25em;
                border-bottom: 1px solid #e0e0e0; padding-bottom: .2em; }
   img { max-width: 100%; height: auto; display: block;
-        margin: 1em 0; border: 1px solid #e0e0e0; border-radius: 4px; }
+        margin: 1em 0; }
   .analysis { margin-top: 1em; }
   .analysis p { margin: .6em 0; }
   .analysis ul, .analysis ol { margin: .6em 0 .6em 1.5em; }

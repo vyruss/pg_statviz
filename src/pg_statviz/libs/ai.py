@@ -399,6 +399,8 @@ def _log_provider_error(label: str, env_var_hint: str, e: Exception) -> None:
     Ollama has its own specific error taxonomy and does not use this helper.
     """
     err = str(e).lower()
+    # SDK wrappers often hide the real failure in __cause__.
+    cause = f" (cause: {e.__cause__!r})" if e.__cause__ else ""
     if any(t in err for t in ("api_key", "api key", "authentication",
                               "unauthenticated", "permission_denied",
                               "401", "403")):
@@ -406,9 +408,13 @@ def _log_provider_error(label: str, env_var_hint: str, e: Exception) -> None:
         _logger.error(f"{label} API authentication failed.{hint}")
     elif any(t in err for t in ("rate", "quota", "credit",
                                 "resource_exhausted", "429")):
-        _logger.error(f"{label} API limit reached (free tier?): {e}")
+        _logger.error(f"{label} API limit reached (free tier?): {e}{cause}")
+    elif any(t in err for t in ("connection", "timeout", "dns",
+                                "name resolution", "network",
+                                "unreachable")):
+        _logger.error(f"{label} network error: {e}{cause}")
     else:
-        _logger.error(f"AI analysis ({label}) failed: {e}")
+        _logger.error(f"AI analysis ({label}) failed: {e}{cause}")
 
 
 # --- Provider adapters -----------------------------------------------------
@@ -542,12 +548,13 @@ def _analyze_local(df: pd.DataFrame, module_name: str,
         # Ollama has its own specific error patterns, distinct from the
         # cloud-provider auth/rate-limit taxonomy handled by
         # _log_provider_error.
+        cause = f" (cause: {e.__cause__!r})" if e.__cause__ else ""
         if 'model' in err and 'not found' in err:
             _logger.error(f"Ollama model {OLLAMA_MODEL} not found. "
                           f"Run: ollama pull {OLLAMA_MODEL}")
         elif 'connection' in err or 'refused' in err:
-            _logger.error("Cannot connect to Ollama server. "
-                          "Is it running? Try: ollama serve")
+            _logger.error(f"Cannot connect to Ollama server. "
+                          f"Is it running? Try: ollama serve.{cause}")
         else:
             _log_provider_error("local Ollama", "", e)
         return None
