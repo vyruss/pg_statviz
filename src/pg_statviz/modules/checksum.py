@@ -108,8 +108,7 @@ def checksum(*, dbname=getpass.getuser(), host="/var/run/postgresql",
                  fontweight='semibold')
     plt.title("Checksum failures")
 
-    plt.plot_date(r.index, r['failures'], label="Checksum failures",
-                  aa=True, linestyle='solid')
+    plt.plot(r.index, r['failures'], label="Checksum failures")
     plt.xlabel("Timestamp", fontweight='semibold')
     plt.ylabel("Cumulative checksum failures", fontweight='semibold')
     fig.axes[0].set_ylim(bottom=0)

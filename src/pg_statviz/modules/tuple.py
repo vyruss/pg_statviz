@@ -118,10 +118,8 @@ def tuple(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     plt.suptitle(f"pg_statviz · {info['hostname']}:{port}",
                  fontweight='semibold')
     splt1.set_title("Tuples read")
-    splt1.plot_date(r.index, r['returned'], label="returned", aa=True,
-                    linestyle='solid')
-    splt1.plot_date(r.index, r['fetched'], label="fetched", aa=True,
-                    linestyle='solid')
+    splt1.plot(r.index, r['returned'], label="returned")
+    splt1.plot(r.index, r['fetched'], label="fetched")
     splt1.set_xlabel("Timestamp", fontweight='semibold')
     splt1.set_ylabel("Tuple count", fontweight='semibold')
     splt1.set_ylim(bottom=0)
@@ -129,12 +127,9 @@ def tuple(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
 
     # Plot tuples written
     splt2.set_title("Tuples written")
-    splt2.plot_date(r.index, r['inserted'], label="inserted", aa=True,
-                    linestyle='solid')
-    splt2.plot_date(r.index, r['updated'], label="updated", aa=True,
-                    linestyle='solid')
-    splt2.plot_date(r.index, r['deleted'], label="deleted", aa=True,
-                    linestyle='solid')
+    splt2.plot(r.index, r['inserted'], label="inserted")
+    splt2.plot(r.index, r['updated'], label="updated")
+    splt2.plot(r.index, r['deleted'], label="deleted")
     splt2.set_xlabel("Timestamp", fontweight='semibold')
     splt2.set_ylabel("Tuple count", fontweight='semibold')
     splt2.set_ylim(bottom=0)
@@ -166,10 +161,10 @@ def tuple(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     plt.suptitle(f"pg_statviz · {info['hostname']}:{port}",
                  fontweight='semibold')
     splt1.set_title("Tuple read rate")
-    splt1.plot_date(rr.index, rr['returned'],
-                    label="returned", aa=True, linestyle='solid')
-    splt1.plot_date(rr.index, rr['fetched'],
-                    label="fetched", aa=True, linestyle='solid')
+    splt1.plot(rr.index, rr['returned'],
+               label="returned")
+    splt1.plot(rr.index, rr['fetched'],
+               label="fetched")
     splt1.set_xlabel("Timestamp", fontweight='semibold')
     splt1.set_ylabel("Avg. tuples per minute", fontweight='semibold')
     splt1.set_ylim(bottom=0)
@@ -177,12 +172,12 @@ def tuple(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
 
     # Plot tuple write rates
     splt2.set_title("Tuple write rate")
-    splt2.plot_date(rr.index, rr['inserted'],
-                    label="inserted", aa=True, linestyle='solid')
-    splt2.plot_date(rr.index, rr['updated'],
-                    label="updated", aa=True, linestyle='solid')
-    splt2.plot_date(rr.index, rr['deleted'],
-                    label="deleted", aa=True, linestyle='solid')
+    splt2.plot(rr.index, rr['inserted'],
+               label="inserted")
+    splt2.plot(rr.index, rr['updated'],
+               label="updated")
+    splt2.plot(rr.index, rr['deleted'],
+               label="deleted")
     splt2.set_xlabel("Timestamp", fontweight='semibold')
     splt2.set_ylabel("Avg. tuples per minute", fontweight='semibold')
     splt2.set_ylim(bottom=0)

@@ -110,8 +110,7 @@ def cache(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                  fontweight='semibold')
     plt.title("Cache hit ratio")
 
-    plt.plot_date(r.index, r, label="hit ratio", aa=True,
-                  linestyle='solid')
+    plt.plot(r.index, r, label="hit ratio")
 
     plt.xlabel("Timestamp", fontweight='semibold')
     plt.ylabel("Cache hit %", fontweight='semibold')

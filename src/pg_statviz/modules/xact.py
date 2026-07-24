@@ -107,10 +107,8 @@ def xact(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                  fontweight='semibold')
     plt.title("Transactions")
 
-    plt.plot_date(r.index, r['committed'], label="Committed", aa=True,
-                  linestyle='solid')
-    plt.plot_date(r.index, r['rolledback'], label="Rolled back", aa=True,
-                  linestyle='solid')
+    plt.plot(r.index, r['committed'], label="Committed")
+    plt.plot(r.index, r['rolledback'], label="Rolled back")
     plt.xlabel("Timestamp", fontweight='semibold')
     plt.ylabel("Transactions (since stats reset)", fontweight='semibold')
     fig.axes[0].set_ylim(bottom=0)
@@ -139,10 +137,8 @@ def xact(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     plt.suptitle(f"pg_statviz · {info['hostname']}:{port}",
                  fontweight='semibold')
     plt.title("Transaction rate")
-    plt.plot_date(rr.index, rr['committed'], label="Committed",
-                  aa=True, linestyle='solid')
-    plt.plot_date(rr.index, rr['rolledback'], label="Rolled back",
-                  aa=True, linestyle='solid')
+    plt.plot(rr.index, rr['committed'], label="Committed")
+    plt.plot(rr.index, rr['rolledback'], label="Rolled back")
     plt.xlabel("Timestamp", fontweight='semibold')
     plt.ylabel("Avg. transactions per minute", fontweight='semibold')
     fig.axes[0].set_ylim(bottom=0)

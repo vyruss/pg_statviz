@@ -21,6 +21,7 @@ def setup():
         fnt.fontManager.addfont(f)
     plt.rcParams['font.family'] = 'Noto Sans'
     plt.rcParams['font.size'] = 12
+    plt.rcParams['lines.marker'] = 'o'
     base_image_path = importlib.resources.files("pg_statviz.libs")\
         .joinpath("pg_statviz.png")
     im = Image.open(str(base_image_path))

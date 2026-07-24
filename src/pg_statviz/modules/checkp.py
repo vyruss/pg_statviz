@@ -121,10 +121,8 @@ def checkp(*, dbname=getpass.getuser(), host="/var/run/postgresql",
     plt.suptitle(f"pg_statviz · {info['hostname']}:{port}",
                  fontweight='semibold')
     plt.title("Checkpoints")
-    plt.plot_date(r.index, r['req'], label="Requested", aa=True,
-                  linestyle='solid')
-    plt.plot_date(r.index, r['timed'], label="Timed", aa=True,
-                  linestyle='solid')
+    plt.plot(r.index, r['req'], label="Requested")
+    plt.plot(r.index, r['timed'], label="Timed")
     plt.xlabel("Timestamp", fontweight='semibold')
     plt.ylabel("Checkpoints (since stats reset)", fontweight='semibold')
 
@@ -164,10 +162,8 @@ def checkp(*, dbname=getpass.getuser(), host="/var/run/postgresql",
     plt.suptitle(f"pg_statviz · {info['hostname']}:{port}",
                  fontweight='semibold')
     plt.title("Checkpoint rate")
-    plt.plot_date(rr.index, rr['req'], label="requested",
-                  aa=True, linestyle='solid')
-    plt.plot_date(rr.index, rr['timed'], label="timed",
-                  aa=True, linestyle='solid')
+    plt.plot(rr.index, rr['req'], label="requested")
+    plt.plot(rr.index, rr['timed'], label="timed")
     plt.xlabel("Timestamp", fontweight='semibold')
     plt.ylabel("Avg. checkpoints per minute", fontweight='semibold')
     fig.legend()

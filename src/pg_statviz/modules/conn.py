@@ -130,26 +130,23 @@ def conn(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     plt.suptitle(f"pg_statviz · {info['hostname']}:{port}",
                  fontweight='semibold')
     plt.title('Connection/status count')
-    plt.plot_date(r.index, r['total'],
-                  label='total', aa=True, linestyle='solid')
+    plt.plot(r.index, r['total'],
+             label='total')
     if not all(c == 0 for c in r['ca']):
-        plt.plot_date(r.index, r['ca'],
-                      label='active', aa=True, linestyle='solid')
+        plt.plot(r.index, r['ca'],
+                 label='active')
     if not all(c == 0 for c in r['ci']):
-        plt.plot_date(r.index, r['ci'],
-                      label='idle', aa=True, linestyle='solid')
+        plt.plot(r.index, r['ci'],
+                 label='idle')
     if not all(c == 0 for c in r['cit']):
-        plt.plot_date(r.index, r['cit'],
-                      label='idle in transaction', aa=True,
-                      linestyle='solid')
+        plt.plot(r.index, r['cit'],
+                 label='idle in transaction')
     if not all(c == 0 for c in r['cita']):
-        plt.plot_date(r.index, r['cita'],
-                      label='idle in transaction (aborted)', aa=True,
-                      linestyle='solid')
+        plt.plot(r.index, r['cita'],
+                 label='idle in transaction (aborted)')
     if not all(c == 0 for c in r['cf']):
-        plt.plot_date(r.index, r['cf'],
-                      label='fastpath function call', aa=True,
-                      linestyle='solid')
+        plt.plot(r.index, r['cf'],
+                 label='fastpath function call')
     plt.xlabel("Timestamp", fontweight='semibold')
     plt.ylabel("No. of connections", fontweight='semibold')
 
@@ -207,7 +204,7 @@ def conn(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
         else:
             rr = uc_frame
         if not all(c == 0 for c in rr[u]):
-            plt.plot_date(rr.index, rr[u], label=u, aa=True, linestyle='solid')
+            plt.plot(rr.index, rr[u], label=u)
     plt.xlabel("Timestamp", fontweight='semibold')
     plt.ylabel("No. of connections", fontweight='semibold')
     fig.axes[0].set_ylim(bottom=0)
@@ -241,14 +238,14 @@ def conn(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                  fontweight='semibold')
     plt.title('Session activity age')
     if not all(c == 0 for c in ra['max_query_age']):
-        plt.plot_date(ra.index, ra['max_query_age'],
-                      label='max query age', aa=True, linestyle='solid')
+        plt.plot(ra.index, ra['max_query_age'],
+                 label='max query age')
     if not all(c == 0 for c in ra['max_xact_age']):
-        plt.plot_date(ra.index, ra['max_xact_age'],
-                      label='max transaction age', aa=True, linestyle='solid')
+        plt.plot(ra.index, ra['max_xact_age'],
+                 label='max transaction age')
     if not all(c == 0 for c in ra['max_backend_age']):
-        plt.plot_date(ra.index, ra['max_backend_age'],
-                      label='max backend age', aa=True, linestyle='solid')
+        plt.plot(ra.index, ra['max_backend_age'],
+                 label='max backend age')
     plt.xlabel("Timestamp", fontweight='semibold')
     plt.ylabel("Age (seconds)", fontweight='semibold')
     fig.axes[0].set_ylim(bottom=0)

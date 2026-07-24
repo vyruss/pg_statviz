@@ -107,14 +107,10 @@ def buf(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     plt.suptitle(f"pg_statviz · {info['hostname']}:{port}",
                  fontweight='semibold')
     plt.title("Buffers written")
-    plt.plot_date(r.index, r['total'], label="total", aa=True,
-                  linestyle='solid')
-    plt.plot_date(r.index, r['checkpoints'], label="checkpoints",
-                  aa=True, linestyle='solid')
-    plt.plot_date(r.index, r['bgwriter'], label="bgwriter", aa=True,
-                  linestyle='solid')
-    plt.plot_date(r.index, r['backends'], label="backends", aa=True,
-                  linestyle='solid')
+    plt.plot(r.index, r['total'], label="total")
+    plt.plot(r.index, r['checkpoints'], label="checkpoints")
+    plt.plot(r.index, r['bgwriter'], label="bgwriter")
+    plt.plot(r.index, r['backends'], label="backends")
     plt.xlabel("Timestamp", fontweight='semibold')
     plt.ylabel("GB written (since stats reset)", fontweight='semibold')
     fig.axes[0].set_ylim(bottom=0)
@@ -145,14 +141,10 @@ def buf(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     plt.suptitle(f"pg_statviz · {info['hostname']}:{port}",
                  fontweight='semibold')
     plt.title("Buffer write rate")
-    plt.plot_date(rr.index, rr['total'], label="total", aa=True,
-                  linestyle='solid')
-    plt.plot_date(rr.index, rr['checkpoints'], label="checkpoints",
-                  aa=True, linestyle='solid')
-    plt.plot_date(rr.index, rr['bgwriter'], label="bgwriter", aa=True,
-                  linestyle='solid')
-    plt.plot_date(rr.index, rr['backends'], label="backends", aa=True,
-                  linestyle='solid')
+    plt.plot(rr.index, rr['total'], label="total")
+    plt.plot(rr.index, rr['checkpoints'], label="checkpoints")
+    plt.plot(rr.index, rr['bgwriter'], label="bgwriter")
+    plt.plot(rr.index, rr['backends'], label="backends")
 
     plt.xlabel("Timestamp", fontweight='semibold')
     plt.ylabel("Avg. write rate in MB/s", fontweight='semibold')

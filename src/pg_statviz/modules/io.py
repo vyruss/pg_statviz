@@ -132,13 +132,12 @@ def io(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                 r = _frame.resample(q + "s").mean()
             else:
                 r = _frame
-            splt1.plot_date(r.index, r,
-                            label=f"{iokind['object']}/"
-                                  if {iokind['object']} == 'temp relation'
-                                  else ""
-                                  f"{iokind['backend_type']}/"
-                                  f"{iokind['context']}",
-                            aa=True, linestyle='solid')
+            splt1.plot(r.index, r,
+                       label=f"{iokind['object']}/"
+                             if {iokind['object']} == 'temp relation'
+                             else ""
+                             f"{iokind['backend_type']}/"
+                             f"{iokind['context']}")
     splt1.set_xlabel("Timestamp", fontweight='semibold')
     splt1.set_ylabel("GB read (at time of snapshot)", fontweight='semibold')
     splt1.set_ylim(bottom=0)
@@ -172,11 +171,10 @@ def io(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                 r = _frame.resample(q + "s").mean()
             else:
                 r = _frame
-            splt2.plot_date(r.index, r,
-                            label=f"{iokind['object']}/"
-                                  f"{iokind['backend_type']}/"
-                                  f"{iokind['context']}",
-                            aa=True, linestyle='solid')
+            splt2.plot(r.index, r,
+                       label=f"{iokind['object']}/"
+                             f"{iokind['backend_type']}/"
+                             f"{iokind['context']}")
     splt2.set_xlabel("Timestamp", fontweight='semibold')
     splt2.set_ylabel("GB written (at time of snapshot)",
                      fontweight='semibold')
@@ -234,8 +232,7 @@ def io(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                 r = _frame.resample(q + "s").mean()
             else:
                 r = _frame
-            splt1.plot_date(r.index, r, label=iokindname, aa=True,
-                            linestyle='solid')
+            splt1.plot(r.index, r, label=iokindname)
     splt1.set_xlabel("Timestamp", fontweight='semibold')
     splt1.set_ylabel("Avg. read rate in MB/s", fontweight='semibold')
     splt1.set_ylim(bottom=0)
@@ -263,8 +260,7 @@ def io(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                 r = _frame.resample(q + "s").mean()
             else:
                 r = _frame
-            splt2.plot_date(r.index, r, label=iokindname, aa=True,
-                            linestyle='solid')
+            splt2.plot(r.index, r, label=iokindname)
     splt2.set_xlabel("Timestamp", fontweight='semibold')
     splt2.set_ylabel("Avg. write rate in MB/s", fontweight='semibold')
     splt2.legend()
