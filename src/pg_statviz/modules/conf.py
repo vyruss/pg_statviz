@@ -138,7 +138,8 @@ def conf(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
             diff_parts.append(f"{param}: {old} -> {new}")
         label = f"{ts_str}: {', '.join(diff_parts)}"
         plt.axvline(x=change['timestamp'], color=colors[i % len(colors)],
-                    linestyle='--', linewidth=1.5, alpha=0.7, label=label)
+                    linestyle='--', linewidth=1.5, alpha=0.7, label=label,
+                    marker='')
 
     plt.xlabel("Timestamp", fontweight='semibold')
     # Pad the x-axis

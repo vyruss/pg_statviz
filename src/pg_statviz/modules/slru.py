@@ -122,8 +122,7 @@ def slru(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                 r = hr_frame.resample(q + "s").mean()
             else:
                 r = hr_frame
-            splt1.plot_date(r.index, r[name], label=name, aa=True,
-                            linestyle='solid')
+            splt1.plot(r.index, r[name], label=name)
     splt1.set_xlabel("Timestamp", fontweight='semibold')
     splt1.set_ylabel("Hit ratio (%)", fontweight='semibold')
     splt1.set_ylim(0, 100)
@@ -155,8 +154,7 @@ def slru(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                 r = read_frame.resample(q + "s").sum()
             else:
                 r = read_frame
-            splt2.plot_date(r.index, r[name], label=name, aa=True,
-                            linestyle='solid')
+            splt2.plot(r.index, r[name], label=name)
     splt2.set_xlabel("Timestamp", fontweight='semibold')
     splt2.set_ylabel("Blocks read", fontweight='semibold')
     splt2.set_ylim(bottom=0)

@@ -120,9 +120,8 @@ def wait(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
         else:
             r = wc_frame
         if not all(c == 0 for c in r[wk]):
-            plt.plot_date(r.index, r[wk],
-                          label=f"{wk[0]}/{wk[1]}",
-                          aa=True, linestyle='solid')
+            plt.plot(r.index, r[wk],
+                     label=f"{wk[0]}/{wk[1]}")
     # Plot total wait events
     # # Downsample if needed
     total_frame = DataFrame(data=total, index=tstamps, copy=False)
@@ -136,7 +135,7 @@ def wait(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
 
     report_sections = []
 
-    plt.plot_date(rr.index, rr, label='Total', aa=True, linestyle='solid')
+    plt.plot(rr.index, rr, label='Total')
     fig.axes[0].set_ylim(bottom=0)
     fig.gca().yaxis.set_major_locator(MaxNLocator(integer=True))
     plt.xlabel("Timestamp", fontweight='semibold')

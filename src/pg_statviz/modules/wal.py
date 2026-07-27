@@ -112,8 +112,7 @@ def wal(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     plt.suptitle(f"pg_statviz · {info['hostname']}:{port}",
                  fontweight='semibold')
     plt.title("WAL generated")
-    plt.plot_date(r.index, r, label="WAL", aa=True,
-                  linestyle='solid')
+    plt.plot(r.index, r, label="WAL")
     plt.xlabel("Timestamp", fontweight='semibold')
     plt.ylabel("GB generated (since stats reset)", fontweight='semibold')
     fig.axes[0].set_ylim(bottom=0)
@@ -144,8 +143,7 @@ def wal(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     plt.suptitle(f"pg_statviz · {info['hostname']}:{port}",
                  fontweight='semibold')
     plt.title("WAL generation rate")
-    plt.plot_date(rr.index, rr, label="WAL", aa=True,
-                  linestyle='solid')
+    plt.plot(rr.index, rr, label="WAL")
     plt.xlabel("Timestamp", fontweight='semibold')
     plt.ylabel("Avg. WAL generation rate (MB/s)", fontweight='semibold')
     fig.legend()

@@ -129,8 +129,7 @@ def repl(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                 r = lag_frame.resample(q + "s").max()
             else:
                 r = lag_frame
-            splt1.plot_date(r.index, r[sb], label=sb, aa=True,
-                            linestyle='solid')
+            splt1.plot(r.index, r[sb], label=sb)
     splt1.set_xlabel("Timestamp", fontweight='semibold')
     splt1.set_ylabel("Lag (bytes)", fontweight='semibold')
     splt1.set_ylim(bottom=0)
@@ -172,8 +171,7 @@ def repl(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                 r = wal_frame.resample(q + "s").max()
             else:
                 r = wal_frame
-            splt2.plot_date(r.index, r[slot], label=slot, aa=True,
-                            linestyle='solid')
+            splt2.plot(r.index, r[slot], label=slot)
     splt2.set_xlabel("Timestamp", fontweight='semibold')
     splt2.set_ylabel("WAL retention (bytes)", fontweight='semibold')
     splt2.set_ylim(bottom=0)

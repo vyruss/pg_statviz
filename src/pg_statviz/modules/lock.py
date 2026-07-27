@@ -115,8 +115,8 @@ def lock(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
         else:
             r = lc_frame
         if not all(c == 0 for c in r[lm]):
-            plt.plot_date(r.index, r[lm],
-                          label=lm, aa=True, linestyle='solid')
+            plt.plot(r.index, r[lm],
+                     label=lm)
 
     # Plot total locks
     # # Downsample if needed
@@ -131,7 +131,7 @@ def lock(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
 
     report_sections = []
 
-    plt.plot_date(rr.index, rr, label='Total', aa=True, linestyle='solid')
+    plt.plot(rr.index, rr, label='Total')
     fig.axes[0].set_ylim(bottom=0)
     fig.gca().yaxis.set_major_locator(MaxNLocator(integer=True))
     plt.xlabel("Timestamp", fontweight='semibold')
