@@ -7,7 +7,7 @@ matplotlib==3.10.8
 numpy==2.4.1
 packaging==25.0
 pandas==2.3.3
-Pillow==12.2.0
+Pillow==12.3.0
 psycopg==3.3.2
 pyparsing==3.3.1
 python-dateutil==2.9.0.post0
