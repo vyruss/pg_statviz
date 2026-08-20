@@ -45,7 +45,7 @@ jobs:
         needs: lint-and-build
         strategy:
             matrix:
-                pg_version: [13, 14, 15, 16, 17, 18]
+                pg_version: [13, 14, 15, 16, 17, 18, 19]
         steps:
             - name: Check out code
               uses: actions/checkout@v4
@@ -53,7 +53,7 @@ jobs:
             - name: Install PostgreSQL ${{ matrix.pg_version }}
               run: |
                   wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg
-                  echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+                  echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main 19" | sudo tee /etc/apt/sources.list.d/pgdg.list
                   sudo apt-get update
                   sudo apt-get install -y postgresql-${{ matrix.pg_version }} postgresql-server-dev-${{ matrix.pg_version }}
 
@@ -101,7 +101,7 @@ jobs:
         needs: lint-and-build
         strategy:
             matrix:
-                pg_version: [13, 14, 15, 16, 17, 18]
+                pg_version: [13, 14, 15, 16, 17, 18, 19]
         steps:
             - name: Check out code
               uses: actions/checkout@v4
@@ -114,7 +114,7 @@ jobs:
             - name: Install PostgreSQL ${{ matrix.pg_version }}
               run: |
                   wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg
-                  echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+                  echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main 19" | sudo tee /etc/apt/sources.list.d/pgdg.list
                   sudo apt-get update
                   sudo apt-get install -y postgresql-${{ matrix.pg_version }}
 

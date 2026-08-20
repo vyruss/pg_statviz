@@ -11,7 +11,8 @@ visualizations for selected time ranges from the stored statistic snapshots, hel
 PostgreSQL performance over time and potentially aiding in performance tuning and troubleshooting.
 
 Optionally, an [AI analysis](#ai-analysis-optional) mode can produce per-module HTML reports
-with chart commentary from a cloud LLM (Claude or Gemini) or a local model via Ollama.
+with chart commentary from a cloud LLM (Claude, Gemini, or OpenAI), any OpenAI-compatible
+endpoint, or a local model via Ollama.
 
 [![Wait events](src/pg_statviz/libs/pg_statviz_srv.example.com_5432_wait.png)](src/pg_statviz/libs/pg_statviz_srv.example.com_5432_wait.png)
 
@@ -98,7 +99,7 @@ using `dnf` or `yum`:
 ### Requirements
 
 Python 3.11+ is required for the visualization utility.
-Any recent PostgreSQL version up to and including 18 is supported.
+Any recent PostgreSQL version up to and including 19 is supported.
 
 ## Usage
 
@@ -168,9 +169,9 @@ The visualization utility can be called like a PostgreSQL command line tool:
 
 [comment]::
 
-    usage: pg_statviz [--help] [--version] [-d DBNAME] [-h HOSTNAME] [-p PORT]
-                      [-U USERNAME] [-W] [-D FROM TO] [-O OUTPUTDIR]
-                      {analyze,buf,cache,checkp,checksum,conn,io,lock,repl,slru,tuple,wait,wal,xact} ...
+    usage: pg_statviz [-?] [--version] [-d DBNAME] [-h HOSTNAME] [-p PORT] [-U USERNAME] [-W]
+                      [-D FROM TO] [-O OUTPUTDIR] [--ai [PROVIDER]]
+                      {analyze,buf,cache,checkp,checksum,conf,conn,io,lock,repl,slru,tuple,wait,wal,xact} ...
 
     run all analysis modules
 
@@ -193,21 +194,22 @@ The visualization utility can be called like a PostgreSQL command line tool:
         xact                run transaction count analysis module
 
     options:
-      --help
+      -?, --help            show this help, then exit
       --version             show program's version number and exit
-      -d DBNAME, --dbname DBNAME
-                            database name to analyze (default: 'myuser')
-      -h HOSTNAME, --host HOSTNAME
-                            database server host or socket directory (default: '/var/run/postgresql')
-      -p PORT, --port PORT  database server port (default: '5432')
-      -U USERNAME, --username USERNAME
+      -d, --dbname DBNAME   database name to analyze (default: 'myuser')
+      -h, --host HOSTNAME   database server host or socket directory (default: '/var/run/postgresql')
+      -p, --port PORT       database server port (default: '5432')
+      -U, --username USERNAME
                             database user name (default: 'myuser')
-      -W, --password        force password prompt (should happen automatically) (default: False)
-      -D FROM TO, --daterange FROM TO
+      -W, --password        force password prompt (should happen automatically) (default: -)
+      -D, --daterange FROM TO
                             date range to be analyzed in ISO 8601 format e.g. 2026-01-01T00:00
                             2026-01-01T23:59 (default: [])
-      -O OUTPUTDIR, --outputdir OUTPUTDIR
+      -O, --outputdir OUTPUTDIR
                             output directory (default: -)
+      --ai [PROVIDER]       enable AI analysis (default provider: claude). Choices: claude
+                            (Anthropic), gemini (Google), openai (OpenAI/compatible), local (Ollama).
+                            (default: -)
 
 ### Specific module usage
 
@@ -215,27 +217,29 @@ The visualization utility can be called like a PostgreSQL command line tool:
 
 [comment]::
 
-    usage: pg_statviz conn [-h] [-d DBNAME] [--host HOSTNAME] [-p PORT] [-U USERNAME] [-W]
-                           [-D FROM TO] [-O OUTPUTDIR] [-u [USERS ...]]
+    usage: pg_statviz conn [-d DBNAME] [-h HOSTNAME] [-p PORT] [-U USERNAME] [-W] [-D FROM TO]
+                           [-O OUTPUTDIR] [--ai [PROVIDER]] [-u [USERS ...]] [-?]
 
     run connection count analysis module
 
     options:
-      -h, --help            show this help message and exit
-      -d DBNAME, --dbname DBNAME
-                            database name to analyze (default: 'myuser')
-      --host HOSTNAME       database server host or socket directory (default: '/var/run/postgresql')
-      -p PORT, --port PORT  database server port (default: '5432')
-      -U USERNAME, --username USERNAME
+      -d, --dbname DBNAME   database name to analyze (default: 'myuser')
+      -h, --host HOSTNAME   database server host or socket directory (default: '/var/run/postgresql')
+      -p, --port PORT       database server port (default: '5432')
+      -U, --username USERNAME
                             database user name (default: 'myuser')
-      -W, --password        force password prompt (should happen automatically) (default: False)
-      -D FROM TO, --daterange FROM TO
+      -W, --password        force password prompt (should happen automatically) (default: -)
+      -D, --daterange FROM TO
                             date range to be analyzed in ISO 8601 format e.g. 2026-01-01T00:00
                             2026-01-01T23:59 (default: [])
-      -O OUTPUTDIR, --outputdir OUTPUTDIR
+      -O, --outputdir OUTPUTDIR
                             output directory (default: -)
-      -u [USERS ...], --users [USERS ...]
+      --ai [PROVIDER]       enable AI analysis (default provider: claude). Choices: claude
+                            (Anthropic), gemini (Google), openai (OpenAI/compatible), local (Ollama).
+                            (default: -)
+      -u, --users [USERS ...]
                             user name(s) to plot in analysis (default: [])
+      -?, --help            show this help, then exit
 
 ### Example:
 
@@ -261,17 +265,29 @@ concrete remediation step for any [WARNING] or [CRITICAL] finding.
 
 ### Enabling AI analysis
 
-Add `--ai` (or `-A`) to any command:
+Add `--ai` to any command:
 
     pg_statviz analyze -d mydb --ai
 
-This uses Claude by default. Three providers are available:
+This uses Claude by default. Four providers are available:
 
 Provider | Flag | Requires
 --- | --- | ---
 [Claude](https://www.anthropic.com/) (Anthropic) | `--ai claude` or `--ai` | `ANTHROPIC_API_KEY`
 [Gemini](https://aistudio.google.com/) (Google AI Studio) | `--ai gemini` | `GOOGLE_API_KEY`
+[OpenAI](https://platform.openai.com/) or compatible | `--ai openai` | `OPENAI_API_KEY`
 Local ([Ollama](https://ollama.com/)) | `--ai local` | Ollama running with `gemma4:e4b`
+
+Whichever provider you pick, the model has to be vision-capable: the charts are
+sent as PNGs alongside the numbers.
+
+For a compatible endpoint (vLLM, LM Studio, llama.cpp, OpenRouter, Groq), set
+`OPENAI_BASE_URL` and `OPENAI_MODEL`:
+
+    export OPENAI_BASE_URL=http://localhost:8000/v1
+    export OPENAI_API_KEY=unused
+    export OPENAI_MODEL=Qwen/Qwen3-VL-8B-Instruct
+    pg_statviz analyze -d mydb --ai openai
 
 ### Installing AI dependencies
 
@@ -293,7 +309,7 @@ images and renders the AI analysis as styled HTML.
 When the `analyze` subcommand is invoked with `--ai`, an additional top-level
 `pg_statviz_<host>_<port>_index.html` report is generated. It synthesises the
 per-module verdicts into a single cross-cutting summary, correlating patterns
-across charts and surfacing the single most important next action.
+across charts and suggesting the single most important next action.
 
 [![AI report sample](src/pg_statviz/libs/pg_statviz_ai_report_sample.png)](src/pg_statviz/libs/pg_statviz_ai_report_sample.png)
 

@@ -14,7 +14,8 @@ from dateutil.parser import isoparse
 from matplotlib.pyplot import close as mpclose
 from pandas import DataFrame
 from pg_statviz.libs import plot
-from pg_statviz.libs.ai import (AI_PROVIDERS, DEFAULT_AI_PROVIDER,
+from pg_statviz.libs.ai import (AI_HELP, AI_PROVIDERS,
+                                DEFAULT_AI_PROVIDER,
                                 run_chart_analysis)
 from pg_statviz.libs.dbconn import dbconn
 from pg_statviz.libs.html_report import finalize_module_report
@@ -32,11 +33,9 @@ from pg_statviz.libs.info import getinfo, get_settings
      help="date range to be analyzed in ISO 8601 format e.g. 2026-01-01T00:00"
           + " 2026-01-01T23:59")
 @arg('-O', '--outputdir', help="output directory")
-@arg('-A', '--ai', nargs='?', const=DEFAULT_AI_PROVIDER, default=None,
+@arg('--ai', nargs='?', const=DEFAULT_AI_PROVIDER, default=None,
      choices=AI_PROVIDERS, metavar='PROVIDER',
-     help="enable AI analysis (default provider: " + DEFAULT_AI_PROVIDER
-          + "). Choices: claude (Anthropic), gemini (Google AI Studio), "
-            "local (Ollama vision model).")
+     help=AI_HELP)
 @arg('--info', help=argparse.SUPPRESS)
 @arg('--conn', help=argparse.SUPPRESS)
 def repl(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",

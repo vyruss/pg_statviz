@@ -67,3 +67,6 @@ Temporary Items
 /regression.diffs
 /regression.out
 /results/
+
+# Local CI logs
+/ci-*.log
