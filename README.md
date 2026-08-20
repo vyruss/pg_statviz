@@ -132,13 +132,14 @@ Or all snapshots can be removed like this:
     NOTICE:  truncate cascades to table "buf"
     NOTICE:  truncate cascades to table "conf"
     NOTICE:  truncate cascades to table "conn"
-    NOTICE:  truncate cascades to table "db"
-    NOTICE:  truncate cascades to table "io"
     NOTICE:  truncate cascades to table "lock"
+    NOTICE:  truncate cascades to table "blocking"
     NOTICE:  truncate cascades to table "repl"
     NOTICE:  truncate cascades to table "slru"
     NOTICE:  truncate cascades to table "wait"
     NOTICE:  truncate cascades to table "wal"
+    NOTICE:  truncate cascades to table "db"
+    NOTICE:  truncate cascades to table "io"
      delete_snapshots
     ------------------
 
@@ -171,13 +172,14 @@ The visualization utility can be called like a PostgreSQL command line tool:
 
     usage: pg_statviz [-?] [--version] [-d DBNAME] [-h HOSTNAME] [-p PORT] [-U USERNAME] [-W]
                       [-D FROM TO] [-O OUTPUTDIR] [--ai [PROVIDER]]
-                      {analyze,buf,cache,checkp,checksum,conf,conn,io,lock,repl,slru,tuple,wait,wal,xact} ...
+                      {analyze,blocking,buf,cache,checkp,checksum,conf,conn,io,lock,repl,slru,tuple,wait,wal,xact} ...
 
     run all analysis modules
 
     positional arguments:
-      {analyze,buf,cache,checkp,checksum,conf,conn,io,lock,repl,slru,tuple,wait,wal,xact}
+      {analyze,blocking,buf,cache,checkp,checksum,conf,conn,io,lock,repl,slru,tuple,wait,wal,xact}
         analyze             run all analysis modules
+        blocking            run blocking locks analysis module
         buf                 run buffers written analysis module
         cache               run cache hit ratio analysis module
         checkp              run checkpoint analysis module
@@ -341,6 +343,7 @@ The `pg_statviz` extension stores its data in the following tables:
 Table | Description
 --- | ---
 `pgstatviz.snapshots` | Timestamped snapshots
+`pgstatviz.blocking` | Blocking locks data
 `pgstatviz.buf` | Buffer, checkpointer and background writer data
 `pgstatviz.conf` | PostgreSQL server configuration data
 `pgstatviz.conn` | Connection data

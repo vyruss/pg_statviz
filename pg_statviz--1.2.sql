@@ -270,6 +270,50 @@ AS $$
 $$ LANGUAGE SQL;
 
 
+-- Blocking locks
+CREATE TABLE IF NOT EXISTS @extschema@.blocking(
+    snapshot_tstamp timestamptz REFERENCES @extschema@.snapshots(snapshot_tstamp) ON DELETE CASCADE PRIMARY KEY,
+    blocked_total int,
+    blockers_total int,
+    blocking jsonb);
+
+CREATE OR REPLACE FUNCTION @extschema@.snapshot_blocking(snapshot_tstamp timestamptz)
+RETURNS void
+AS $$
+    WITH
+        blk AS (
+            -- pg_blocking_pids() resolves the wait graph itself, including
+            -- soft blocks from sessions merely ahead in the lock queue
+            SELECT DISTINCT
+                blocked.pid AS blocked_pid,
+                l.locktype AS lock_type,
+                bp.pid AS blocking_pid
+            FROM pg_catalog.pg_stat_activity blocked
+            JOIN pg_catalog.pg_locks l
+                ON l.pid = blocked.pid AND NOT l.granted
+            CROSS JOIN LATERAL unnest(pg_blocking_pids(blocked.pid)) AS bp(pid)
+            WHERE blocked.datname = current_database()
+            AND blocked.pid != pg_backend_pid()), -- ignore snapshot session
+        blocks AS (
+            SELECT coalesce(jsonb_agg(b), '[]'::jsonb)
+            FROM (
+                SELECT lock_type, count(DISTINCT blocked_pid) AS blocked_count
+                FROM blk
+                GROUP BY lock_type) b)
+    INSERT INTO @extschema@.blocking (
+        snapshot_tstamp,
+        blocked_total,
+        blockers_total,
+        blocking)
+    SELECT
+        snapshot_tstamp,
+        count(DISTINCT blocked_pid) AS blocked_total,
+        count(DISTINCT blocking_pid) AS blockers_total,
+        (SELECT * from blocks) AS blocking
+    FROM blk;
+$$ LANGUAGE SQL;
+
+
 -- Replication
 CREATE TABLE IF NOT EXISTS @extschema@.repl(
     snapshot_tstamp timestamptz REFERENCES @extschema@.snapshots(snapshot_tstamp) ON DELETE CASCADE PRIMARY KEY,
@@ -666,6 +710,7 @@ AS $$
             PERFORM @extschema@.snapshot_io(ts);
         END IF;
         PERFORM @extschema@.snapshot_lock(ts);
+        PERFORM @extschema@.snapshot_blocking(ts);
         PERFORM @extschema@.snapshot_repl(ts);
         PERFORM @extschema@.snapshot_slru(ts);
         PERFORM @extschema@.snapshot_wait(ts);
@@ -689,6 +734,7 @@ $$ LANGUAGE PLPGSQL;
 
 
 -- Make tables dumpable
+SELECT pg_catalog.pg_extension_config_dump('pgstatviz.blocking', '');
 SELECT pg_catalog.pg_extension_config_dump('pgstatviz.buf', '');
 SELECT pg_catalog.pg_extension_config_dump('pgstatviz.conf', '');
 SELECT pg_catalog.pg_extension_config_dump('pgstatviz.conn', '');

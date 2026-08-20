@@ -11,6 +11,7 @@ import logging
 from argh.decorators import arg
 from pg_statviz.libs.ai import (AI_HELP, AI_PROVIDERS,
                                 DEFAULT_AI_PROVIDER)
+from pg_statviz.modules.blocking import blocking
 from pg_statviz.modules.buf import buf
 from pg_statviz.modules.cache import cache
 from pg_statviz.modules.checkp import checkp
@@ -57,7 +58,7 @@ def analyze(*, dbname=getpass.getuser(), host="/var/run/postgresql",
     _logger = logging.getLogger(__name__)
     common = dict(daterange=daterange, outputdir=outputdir, ai=ai,
                   info=info, conn=connx)
-    for mod in (buf, checkp, cache, checksum, conf, conn, io,
+    for mod in (blocking, buf, checkp, cache, checksum, conf, conn, io,
                 lock, repl, slru, tuple, wait, wal, xact):
         try:
             mod(**common)

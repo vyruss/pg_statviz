@@ -12,6 +12,7 @@ import sys
 from argh import ArghParser
 from argh.utils import get_subparsers
 from pg_statviz.modules.analyze import analyze
+from pg_statviz.modules.blocking import blocking
 from pg_statviz.modules.buf import buf
 from pg_statviz.modules.cache import cache
 from pg_statviz.modules.checkp import checkp
@@ -46,8 +47,9 @@ def main():
     p.add_argument('--version', action='version',
                    version=f"pg_statviz {__version__}")
 
-    p.add_commands([analyze, buf, cache, checkp, checksum, conf, conn, io,
-                    lock, repl, slru, tuple, wait, wal, xact],
+    p.add_commands([analyze, blocking, buf, cache, checkp, checksum, conf,
+                    conn, io, lock, repl, slru, tuple, wait, wal,
+                    xact],
                    func_kwargs={'add_help': False})
     for subparser in get_subparsers(p).choices.values():
         subparser.add_argument(*HELP_FLAGS, action='help', help=HELP_TEXT)
