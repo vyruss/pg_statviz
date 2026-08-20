@@ -1,6 +1,6 @@
 [project]
 name = "pg_statviz"
-version = "1.1"
+version = "1.2"
 description = "A minimalist extension and utility pair for time series analysis and visualization of PostgreSQL internal statistics."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -12,11 +12,12 @@ classifiers = ["Development Status :: 5 - Production/Stable",
 dependencies = ["argh<0.30", "contourpy", "cycler", "fonttools", "kiwisolver", "matplotlib", "numpy", "packaging", "pandas", "Pillow", "psycopg", "pyparsing", "python-dateutil", "six"]
 
 [project.optional-dependencies]
-# Opt-in AI analysis. Installs the SDKs for all three --ai providers
-# (Claude via anthropic, Gemini via google-genai, local vision via ollama)
-# so the user can pick any one at runtime without a second install step.
-# None of these are needed for the default chart-generation workflow.
-ai = ["anthropic", "google-genai", "ollama"]
+# Opt-in AI analysis. Installs the SDKs for all four --ai providers (Claude
+# via anthropic, Gemini via google-genai, OpenAI and any OpenAI-compatible
+# endpoint via openai, local vision via ollama) so the user can pick any one
+# at runtime without a second install step. None of these are needed for the
+# default chart-generation workflow.
+ai = ["anthropic", "google-genai", "openai", "ollama"]
 
 [project.urls]
 "Homepage" = "https://github.com/vyruss/pg_statviz"

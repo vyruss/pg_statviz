@@ -6,10 +6,11 @@ pg_statviz - stats visualization and time series analysis
 __author__ = "Jimmy Angelakos"
 __copyright__ = "Copyright (c) 2026 Jimmy Angelakos"
 __license__ = "PostgreSQL License"
-__version__ = "1.1"
+__version__ = "1.2"
 
 import sys
 from argh import ArghParser
+from argh.utils import get_subparsers
 from pg_statviz.modules.analyze import analyze
 from pg_statviz.modules.buf import buf
 from pg_statviz.modules.cache import cache
@@ -32,15 +33,24 @@ if sys.version_info < (3, 11):
     raise SystemExit("This program requires Python 3.11 or later")
 
 
+HELP_FLAGS = ('-?', '--help')
+HELP_TEXT = "show this help, then exit"
+
+
 def main():
-    # CLI parser
+    # CLI parser. add_help is off at both levels so that -h stays free for
+    # --host, as in psql and the other PostgreSQL client tools; they expose
+    # help as -? / --help instead.
     p = ArghParser(add_help=False)
-    p.add_argument("--help", action="help")
+    p.add_argument(*HELP_FLAGS, action='help', help=HELP_TEXT)
     p.add_argument('--version', action='version',
                    version=f"pg_statviz {__version__}")
 
     p.add_commands([analyze, buf, cache, checkp, checksum, conf, conn, io,
-                    lock, repl, slru, tuple, wait, wal, xact])
+                    lock, repl, slru, tuple, wait, wal, xact],
+                   func_kwargs={'add_help': False})
+    for subparser in get_subparsers(p).choices.values():
+        subparser.add_argument(*HELP_FLAGS, action='help', help=HELP_TEXT)
     p.set_default_command(analyze)
     p.dispatch()
 

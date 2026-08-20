@@ -9,7 +9,8 @@ __license__ = "PostgreSQL License"
 import getpass
 import logging
 from argh.decorators import arg
-from pg_statviz.libs.ai import AI_PROVIDERS, DEFAULT_AI_PROVIDER
+from pg_statviz.libs.ai import (AI_HELP, AI_PROVIDERS,
+                                DEFAULT_AI_PROVIDER)
 from pg_statviz.modules.buf import buf
 from pg_statviz.modules.cache import cache
 from pg_statviz.modules.checkp import checkp
@@ -40,11 +41,9 @@ from pg_statviz.libs.info import getinfo
      help="date range to be analyzed in ISO 8601 format e.g. 2026-01-01T00:00 "
           + "2026-01-01T23:59")
 @arg('-O', '--outputdir', help="output directory")
-@arg('-A', '--ai', nargs='?', const=DEFAULT_AI_PROVIDER, default=None,
+@arg('--ai', nargs='?', const=DEFAULT_AI_PROVIDER, default=None,
      choices=AI_PROVIDERS, metavar='PROVIDER',
-     help="enable AI analysis (default provider: " + DEFAULT_AI_PROVIDER
-          + "). Choices: claude (Anthropic), gemini (Google AI Studio), "
-            "local (Ollama vision model).")
+     help=AI_HELP)
 def analyze(*, dbname=getpass.getuser(), host="/var/run/postgresql",
             port="5432", username=getpass.getuser(), password=None,
             daterange=[], outputdir=None, ai=None):

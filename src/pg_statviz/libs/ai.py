@@ -1,9 +1,10 @@
 """
 pg_statviz - stats visualization and time series analysis
 
-AI analysis backend. Provides three provider adapters (Claude / Gemini / local
-Ollama) behind a single synchronous entry point, plus a module-facing helper
-that owns the per-chart ceremony so leaf modules stay focused on charts.
+AI analysis backend. Provides four provider adapters (Claude / Gemini /
+OpenAI-compatible / local Ollama) behind a single synchronous entry point,
+plus a module-facing helper that owns the per-chart ceremony so leaf modules
+stay focused on charts.
 """
 
 __author__ = "Jimmy Angelakos"
@@ -41,6 +42,12 @@ except ImportError:
     GOOGLE_GENAI_AVAILABLE = False
 
 try:
+    import openai
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
+
+try:
     import ollama
     OLLAMA_AVAILABLE = True
 except ImportError:
@@ -48,22 +55,33 @@ except ImportError:
 
 
 # --- Defaults --------------------------------------------------------------
-# All three default models must be vision-capable so they can read the chart
-# PNGs alongside the textual data summary.
-CLAUDE_MODEL = "claude-sonnet-4-6"
-# latest free-tier-eligible Gemini (Apr 2026)
-GEMINI_MODEL = "gemini-2.5-flash"
+# Every default model must be vision-capable so it can read the chart PNGs
+# alongside the textual data summary.
+CLAUDE_MODEL = "claude-sonnet-5"
+# Most capable free-tier-eligible Gemini. The Pro series left the free tier
+# in Apr 2026, so Flash-class is the ceiling.
+GEMINI_MODEL = "gemini-3.7-flash"
 # Gemma 4 E4B: Google's current small vision-capable open model.
 # ~4.5B effective params, vision-capable (reads chart PNGs).
 # Needs ~10 GB VRAM to run fully on GPU; partially offloads to
 # CPU on smaller cards.
 OLLAMA_MODEL = "gemma4:e4b"
+# Cheapest of the current OpenAI frontier family, vision-capable. Any
+# OpenAI-compatible server names its models differently, so OPENAI_MODEL
+# overrides this at runtime.
+OPENAI_MODEL = "gpt-5.6-luna"
 
 # Selectable provider keys exposed on the CLI as `--ai [PROVIDER]`.
 # Imported by every module so the argparse choices list stays in lockstep
 # with the registry.
-AI_PROVIDERS = ('claude', 'gemini', 'local')
+AI_PROVIDERS = ('claude', 'gemini', 'openai', 'local')
 DEFAULT_AI_PROVIDER = 'claude'
+
+# Shared --ai help string. Lives here so the provider list is described in
+# one place rather than in all fifteen module argparse decorators.
+AI_HELP = ("enable AI analysis (default provider: " + DEFAULT_AI_PROVIDER
+           + "). Choices: claude (Anthropic), gemini (Google), "
+             "openai (OpenAI/compatible), local (Ollama).")
 
 ANTHROPIC_INSTALL_GUIDE = """
 AI analysis with --ai claude (default) requires the Anthropic Python SDK and
@@ -89,10 +107,39 @@ Google AI Studio API key (free tier). Setup:
    (or: pip install google-genai)
 
 2. Get an API key at https://aistudio.google.com/apikey
-   (Free tier covers gemini-2.5-flash and other 2.5-series models.)
+   (Free tier covers gemini-3.7-flash and the other Flash models.)
 
 3. Export it before running pg_statviz:
    export GOOGLE_API_KEY=...
+"""
+
+OPENAI_INSTALL_GUIDE = f"""
+AI analysis with --ai openai requires the OpenAI Python SDK and an endpoint
+that speaks the OpenAI chat completions API. Setup:
+
+1. Install the AI extras:
+   pip install pg_statviz[ai]
+   (or: pip install openai)
+
+2. Point it at an endpoint:
+
+   OpenAI itself -- get a key at https://platform.openai.com/api-keys
+
+     export OPENAI_API_KEY=sk-...
+
+   Any OpenAI-compatible server (vLLM, LM Studio, llama.cpp, Ollama's
+   /v1 endpoint, OpenRouter, Groq, ...) -- set the base URL too. Servers
+   that don't check the key still need it set to something:
+
+     export OPENAI_BASE_URL=http://localhost:8000/v1
+     export OPENAI_API_KEY=unused
+
+3. Optionally pick the model (default: {OPENAI_MODEL}). Required for
+   compatible servers, whose model names are their own:
+
+     export OPENAI_MODEL=Qwen/Qwen3-VL-8B-Instruct
+
+   The model must be vision-capable to read the chart images.
 """
 
 OLLAMA_INSTALL_GUIDE = f"""
@@ -514,6 +561,67 @@ def _analyze_gemini(df: pd.DataFrame, module_name: str,
         return None
 
 
+def _openai_client():
+    """Build an OpenAI SDK client.
+
+    The SDK reads OPENAI_API_KEY and OPENAI_BASE_URL from the environment
+    itself, so pointing pg_statviz at a compatible server needs no code
+    path of its own. Wrapped in a function purely so tests can substitute
+    a stand-in client.
+    """
+    return openai.OpenAI()
+
+
+def _openai_messages(system_prompt: str, user_text: str,
+                     image_paths=None) -> list:
+    """Build the chat-completions message list.
+
+    Images are inlined as base64 data URLs in the image_url content part,
+    which is the shape every OpenAI-compatible server implements. Images
+    lead and text trails, matching the other providers.
+    """
+    content = [{
+        "type": "image_url",
+        "image_url": {
+            "url": "data:image/png;base64,"
+                   + base64.standard_b64encode(img).decode("ascii"),
+        },
+    } for img in _read_images(image_paths)]
+    content.append({"type": "text", "text": user_text})
+    return [{"role": "system", "content": system_prompt},
+            {"role": "user", "content": content}]
+
+
+def _analyze_openai(df: pd.DataFrame, module_name: str,
+                    metric_description: str,
+                    image_paths, info: dict | None = None,
+                    settings: dict | None = None,
+                    findings: list | None = None) -> str | None:
+    """Run analysis via OpenAI or any OpenAI-compatible chat endpoint."""
+    if not OPENAI_AVAILABLE:
+        _logger.warning("openai package not installed."
+                        + OPENAI_INSTALL_GUIDE)
+        return None
+    if not os.environ.get("OPENAI_API_KEY"):
+        _logger.error("OPENAI_API_KEY env var is not set."
+                      + OPENAI_INSTALL_GUIDE)
+        return None
+
+    user_text = _build_user_text(module_name, metric_description, df,
+                                 info, settings, findings)
+    try:
+        with _timed("OpenAI"):
+            response = _openai_client().chat.completions.create(
+                model=os.environ.get("OPENAI_MODEL", OPENAI_MODEL),
+                messages=_openai_messages(SYSTEM_PROMPT, user_text,
+                                          image_paths),
+            )
+        return response.choices[0].message.content
+    except Exception as e:
+        _log_provider_error("OpenAI", "OPENAI_API_KEY", e)
+        return None
+
+
 def _analyze_local(df: pd.DataFrame, module_name: str,
                    metric_description: str,
                    image_paths, info: dict | None = None,
@@ -577,6 +685,13 @@ _PROVIDERS = {
         'install_guide': GEMINI_INSTALL_GUIDE,
         'sdk_pkg': 'google-genai',
         'label': 'Gemini',
+    },
+    'openai': {
+        'fn': _analyze_openai,
+        'available': lambda: OPENAI_AVAILABLE,
+        'install_guide': OPENAI_INSTALL_GUIDE,
+        'sdk_pkg': 'openai',
+        'label': 'OpenAI',
     },
     'local': {
         'fn': _analyze_local,
@@ -714,6 +829,21 @@ def _chat_gemini(system_prompt: str, user_text: str) -> str | None:
         return None
 
 
+def _chat_openai(system_prompt: str, user_text: str) -> str | None:
+    if not OPENAI_AVAILABLE or not os.environ.get("OPENAI_API_KEY"):
+        return None
+    try:
+        with _timed("OpenAI overview"):
+            r = _openai_client().chat.completions.create(
+                model=os.environ.get("OPENAI_MODEL", OPENAI_MODEL),
+                messages=_openai_messages(system_prompt, user_text),
+            )
+        return r.choices[0].message.content
+    except Exception as e:
+        _log_provider_error("OpenAI", "OPENAI_API_KEY", e)
+        return None
+
+
 def _chat_local(system_prompt: str, user_text: str) -> str | None:
     if not OLLAMA_AVAILABLE:
         return None
@@ -734,6 +864,7 @@ def _chat_local(system_prompt: str, user_text: str) -> str | None:
 _CHAT_PROVIDERS = {
     'claude': _chat_claude,
     'gemini': _chat_gemini,
+    'openai': _chat_openai,
     'local': _chat_local,
 }
 
