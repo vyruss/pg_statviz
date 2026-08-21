@@ -17,7 +17,10 @@ import os
 import re
 import time
 from contextlib import contextmanager
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as pkg_version
 from pathlib import Path
+from packaging.version import Version
 import pandas as pd
 
 logging.basicConfig()
@@ -52,6 +55,16 @@ try:
     OLLAMA_AVAILABLE = True
 except ImportError:
     OLLAMA_AVAILABLE = False
+
+# think= was added in ollama-python 0.5.0; older clients reject the kwarg.
+# Without distribution metadata the version is unknowable, so leave it out:
+# omitting it works on every version.
+try:
+    OLLAMA_THINK = ({'think': False}
+                    if Version(pkg_version('ollama')) >= Version('0.5.0')
+                    else {})
+except PackageNotFoundError:
+    OLLAMA_THINK = {}
 
 
 # --- Defaults --------------------------------------------------------------
@@ -645,11 +658,11 @@ def _analyze_local(df: pd.DataFrame, module_name: str,
 
     try:
         with _timed("local Ollama"):
-            # think=False disables Gemma 4's hidden reasoning tokens, which
-            # otherwise generate ~800+ discarded tokens per call (5–10× the
-            # visible answer size) and dominate latency on iGPU.
+            # OLLAMA_THINK disables Gemma 4's hidden reasoning tokens,
+            # which otherwise generate ~800+ discarded tokens per call
+            # (5–10× the visible answer size) and dominate latency on iGPU.
             response = ollama.chat(model=OLLAMA_MODEL, messages=[message],
-                                   think=False)
+                                   **OLLAMA_THINK)
         return response['message']['content']
     except Exception as e:
         err = str(e).lower()
@@ -853,7 +866,7 @@ def _chat_local(system_prompt: str, user_text: str) -> str | None:
                 model=OLLAMA_MODEL,
                 messages=[{"role": "user",
                            "content": system_prompt + "\n\n" + user_text}],
-                think=False,
+                **OLLAMA_THINK,
             )
         return r['message']['content']
     except Exception as e:
