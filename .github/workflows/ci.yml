@@ -12,7 +12,7 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: Check out code
-              uses: actions/checkout@v4
+              uses: actions/checkout@v7
 
             - name: Set up Python
               uses: actions/setup-python@v7
@@ -48,7 +48,7 @@ jobs:
                 pg_version: [13, 14, 15, 16, 17, 18, 19]
         steps:
             - name: Check out code
-              uses: actions/checkout@v4
+              uses: actions/checkout@v7
 
             - name: Install PostgreSQL ${{ matrix.pg_version }}
               run: |
@@ -104,7 +104,7 @@ jobs:
                 pg_version: [13, 14, 15, 16, 17, 18, 19]
         steps:
             - name: Check out code
-              uses: actions/checkout@v4
+              uses: actions/checkout@v7
 
             - name: Set up Python
               uses: actions/setup-python@v7
