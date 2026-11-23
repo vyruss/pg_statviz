@@ -14,3 +14,11 @@ SELECT count(*)
      1
 (1 row)
 
+SELECT (count(*) = 1) = (current_setting('server_version_num')::int >= 190000)
+    AS lockwait_ok
+    FROM pgstatviz.lockwait;
+ lockwait_ok 
+-------------
+ t
+(1 row)
+

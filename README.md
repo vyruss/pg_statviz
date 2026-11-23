@@ -134,6 +134,7 @@ Or all snapshots can be removed like this:
     NOTICE:  truncate cascades to table "conn"
     NOTICE:  truncate cascades to table "lock"
     NOTICE:  truncate cascades to table "blocking"
+    NOTICE:  truncate cascades to table "lockwait"
     NOTICE:  truncate cascades to table "repl"
     NOTICE:  truncate cascades to table "slru"
     NOTICE:  truncate cascades to table "wait"
@@ -172,12 +173,12 @@ The visualization utility can be called like a PostgreSQL command line tool:
 
     usage: pg_statviz [-?] [--version] [-d DBNAME] [-h HOSTNAME] [-p PORT] [-U USERNAME] [-W]
                       [-D FROM TO] [-O OUTPUTDIR] [--ai [PROVIDER]]
-                      {analyze,blocking,buf,cache,checkp,checksum,conf,conn,io,lock,repl,slru,tuple,wait,wal,xact} ...
+                      {analyze,blocking,buf,cache,checkp,checksum,conf,conn,io,lock,lockwait,repl,slru,tuple,wait,wal,xact} ...
 
     run all analysis modules
 
     positional arguments:
-      {analyze,blocking,buf,cache,checkp,checksum,conf,conn,io,lock,repl,slru,tuple,wait,wal,xact}
+      {analyze,blocking,buf,cache,checkp,checksum,conf,conn,io,lock,lockwait,repl,slru,tuple,wait,wal,xact}
         analyze             run all analysis modules
         blocking            run blocking locks analysis module
         buf                 run buffers written analysis module
@@ -188,6 +189,7 @@ The visualization utility can be called like a PostgreSQL command line tool:
         conn                run connection count analysis module
         io                  run I/O analysis module
         lock                run locks analysis module
+        lockwait            run lock wait statistics analysis module
         repl                run replication analysis module
         slru                run SLRU analysis module
         tuple               run tuple count analysis module
@@ -350,6 +352,7 @@ Table | Description
 `pgstatviz.db` | PostgreSQL server and database statistics
 `pgstatviz.io` | I/O stats data
 `pgstatviz.lock` | Locks data
+`pgstatviz.lockwait` | Lock wait statistics data (PostgreSQL 19+)
 `pgstatviz.repl` | Replication stats data
 `pgstatviz.slru` | SLRU cache stats data
 `pgstatviz.wait` | Wait events data

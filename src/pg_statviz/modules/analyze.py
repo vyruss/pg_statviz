@@ -20,6 +20,7 @@ from pg_statviz.modules.conf import conf
 from pg_statviz.modules.conn import conn
 from pg_statviz.modules.io import io
 from pg_statviz.modules.lock import lock
+from pg_statviz.modules.lockwait import lockwait
 from pg_statviz.modules.repl import repl
 from pg_statviz.modules.slru import slru
 from pg_statviz.modules.tuple import tuple
@@ -57,9 +58,9 @@ def analyze(*, dbname=getpass.getuser(), host="/var/run/postgresql",
     info = getinfo(connx)
     _logger = logging.getLogger(__name__)
     common = dict(daterange=daterange, outputdir=outputdir, ai=ai,
-                  info=info, conn=connx)
+                  info=info, conn=connx, port=port)
     for mod in (blocking, buf, checkp, cache, checksum, conf, conn, io,
-                lock, repl, slru, tuple, wait, wal, xact):
+                lock, lockwait, repl, slru, tuple, wait, wal, xact):
         try:
             mod(**common)
         except SystemExit as e:

@@ -80,7 +80,9 @@ def repl(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     standby_lag = [s['standby_lag'] for s in data]
     slot_stats = [s['slot_stats'] for s in data]
     settings = get_settings(conn, ['max_wal_senders', 'max_replication_slots',
-                                   'max_wal_size'])
+                                   'max_wal_size', 'max_slot_wal_keep_size',
+                                   'wal_keep_size',
+                                   'idle_replication_slot_timeout'])
 
     # Build flattened DataFrame for AI analysis
     repl_df = build_repl_dataframe(standby_lag, slot_stats, tstamps)
