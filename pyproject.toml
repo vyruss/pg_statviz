@@ -1,6 +1,6 @@
 [project]
 name = "pg_statviz"
-version = "1.2"
+version = "1.3"
 description = "A minimalist extension and utility pair for time series analysis and visualization of PostgreSQL internal statistics."
 readme = "README.md"
 requires-python = ">=3.11"

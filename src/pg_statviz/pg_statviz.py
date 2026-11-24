@@ -6,7 +6,7 @@ pg_statviz - stats visualization and time series analysis
 __author__ = "Jimmy Angelakos"
 __copyright__ = "Copyright (c) 2026 Jimmy Angelakos"
 __license__ = "PostgreSQL License"
-__version__ = "1.2"
+__version__ = "1.3"
 
 import sys
 from argh import ArghParser
@@ -21,6 +21,7 @@ from pg_statviz.modules.conf import conf
 from pg_statviz.modules.conn import conn
 from pg_statviz.modules.io import io
 from pg_statviz.modules.lock import lock
+from pg_statviz.modules.lockwait import lockwait
 from pg_statviz.modules.repl import repl
 from pg_statviz.modules.slru import slru
 from pg_statviz.modules.tuple import tuple
@@ -48,7 +49,7 @@ def main():
                    version=f"pg_statviz {__version__}")
 
     p.add_commands([analyze, blocking, buf, cache, checkp, checksum, conf,
-                    conn, io, lock, repl, slru, tuple, wait, wal,
+                    conn, io, lock, lockwait, repl, slru, tuple, wait, wal,
                     xact],
                    func_kwargs={'add_help': False})
     for subparser in get_subparsers(p).choices.values():

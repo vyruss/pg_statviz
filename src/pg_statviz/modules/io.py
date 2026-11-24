@@ -13,7 +13,6 @@ import numpy
 from argh.decorators import arg
 from dateutil.parser import isoparse
 from matplotlib.pyplot import close as mpclose
-from matplotlib.ticker import MaxNLocator
 from pandas import DataFrame
 from pg_statviz.libs import plot
 from pg_statviz.libs.ai import (AI_HELP, AI_PROVIDERS,
@@ -21,7 +20,7 @@ from pg_statviz.libs.ai import (AI_HELP, AI_PROVIDERS,
                                 run_chart_analysis)
 from pg_statviz.libs.dbconn import dbconn
 from pg_statviz.libs.html_report import finalize_module_report
-from pg_statviz.libs.info import getinfo
+from pg_statviz.libs.info import getinfo, get_settings
 
 
 @arg('-d', '--dbname', help="database name to analyze")
@@ -90,97 +89,25 @@ def io(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
 
     tstamps = [ts['snapshot_tstamp'] for ts in data]
     blcksz = int(data[0]['block_size'])
-    iostats, iokinds = calc_iostats(data, blcksz)
-    iorates = calc_iorates(data, iokinds, blcksz)
+    iostats = calc_iostats(data, blcksz)
+    iorates = calc_iorates(data, iostats)
+    settings = get_settings(conn, ['io_method', 'io_workers', 'io_min_workers',
+                                   'io_max_workers', 'io_worker_idle_timeout',
+                                   'io_worker_launch_interval'])
 
     # Build a flattened DataFrame for AI analysis
-    io_df = build_io_dataframe(iostats, iokinds, tstamps)
+    io_df = build_io_dataframe(iostats, 1073741824, 'GB', tstamps)
 
     report_sections = []
 
-    # Plot as many of each I/O kinds we have per snapshot
+    # Plot reads and writes of each I/O kind per snapshot
     plt, fig, splt1, splt2 = plot.setupdouble()
     plt.suptitle(f"pg_statviz · {info['hostname']}:{port}",
                  fontweight='semibold')
-
-    # Plot Reads
-    splt1.set_title("I/O Reads")
-    for iokind in iokinds:
-        iobytes = []
-        for snapshot in iostats:
-            found = False
-            for entry in snapshot:
-                if {'backend_type': entry['backend_type'],
-                        'object': entry['object'],
-                        'context': entry['context']} == iokind:
-                    found = True
-                    r = entry['reads']
-                    if r:
-                        iobytes += round(r / 1073741824, 1 if r >= 100 else 2),
-                    else:
-                        found = False
-            if not found:
-                iobytes += 0,
-        if not all(b == 0 for b in iobytes):
-            # Downsample if needed
-            _frame = DataFrame(data=iobytes, index=tstamps, copy=False)
-            if len(tstamps) > plot.MAX_POINTS:
-                q = str(round(
-                    (tstamps[-1] - tstamps[0]).total_seconds()
-                    / plot.MAX_POINTS, 2))
-                r = _frame.resample(q + "s").mean()
-            else:
-                r = _frame
-            splt1.plot(r.index, r,
-                       label=f"{iokind['object']}/"
-                             if {iokind['object']} == 'temp relation'
-                             else ""
-                             f"{iokind['backend_type']}/"
-                             f"{iokind['context']}")
-    splt1.set_xlabel("Timestamp", fontweight='semibold')
-    splt1.set_ylabel("GB read (at time of snapshot)", fontweight='semibold')
-    splt1.set_ylim(bottom=0)
-    splt1.legend()
-
-    # Plot Writes
-    splt2.set_title("I/O Writes")
-    for iokind in iokinds:
-        iobytes = []
-        for snapshot in iostats:
-            found = False
-            for entry in snapshot:
-                if {'backend_type': entry['backend_type'],
-                        'object': entry['object'],
-                        'context': entry['context']} == iokind:
-                    found = True
-                    w = entry['writes']
-                    if w:
-                        iobytes += round(w / 1073741824, 1 if w >= 100 else 2),
-                    else:
-                        found = False
-            if not found:
-                iobytes += 0,
-        if not all(b == 0 for b in iobytes):
-            # Downsample if needed
-            _frame = DataFrame(data=iobytes, index=tstamps, copy=False)
-            if len(tstamps) > plot.MAX_POINTS:
-                q = str(round(
-                    (tstamps[-1] - tstamps[0]).total_seconds()
-                    / plot.MAX_POINTS, 2))
-                r = _frame.resample(q + "s").mean()
-            else:
-                r = _frame
-            splt2.plot(r.index, r,
-                       label=f"{iokind['object']}/"
-                             f"{iokind['backend_type']}/"
-                             f"{iokind['context']}")
-    splt2.set_xlabel("Timestamp", fontweight='semibold')
-    splt2.set_ylabel("GB written (at time of snapshot)",
-                     fontweight='semibold')
-    splt2.set_ylim(bottom=0)
-    splt2.legend()
-
-    fig.gca().yaxis.set_major_locator(MaxNLocator(integer=True))
+    plot_iokinds(splt1, iostats['read'], tstamps, "I/O Reads",
+                 "{} read (at time of snapshot)")
+    plot_iokinds(splt2, iostats['write'], tstamps, "I/O Writes",
+                 "{} written (at time of snapshot)")
     outfile = f"""{
         outputdir.rstrip("/") + "/" if outputdir
         else ''}pg_statviz_{info['hostname']
@@ -199,72 +126,20 @@ def io(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                            "threshold. Default to [HEALTHY].",
         outfile=outfile,
         info=info,
+        settings=settings,
     )
 
     # Build rate DataFrame for AI analysis
-    rate_df = build_iorate_dataframe(iorates, iokinds, tstamps)
+    rate_df = build_io_dataframe(iorates, 1048576, 'MBps', tstamps)
 
     # Plot I/O Rates
     plt, fig, splt1, splt2 = plot.setupdouble()
     plt.suptitle(f"pg_statviz · {info['hostname']}:{port}",
                  fontweight='semibold')
-
-    # Plot Read Rates
-    splt1.set_title("I/O Read Rate")
-    for iokind in iokinds:
-        iokindname = (f"{iokind['object']}/"
-                      if {iokind['object']} == 'temp relation'
-                      else ""
-                      f"{iokind['backend_type']}/"
-                      f"{iokind['context']}")
-        if not all(numpy.isnan(v) or v == 0
-                   for v in iorates['reads'][iokindname]):
-            # Downsample if needed
-            _frame = DataFrame(
-                data=[round(v / 1048576, 1 if v >= 100 else 2)
-                      for v in iorates['reads'][iokindname]],
-                index=tstamps, copy=False)
-            if len(tstamps) > plot.MAX_POINTS:
-                q = str(round(
-                    (tstamps[-1] - tstamps[0]).total_seconds()
-                    / plot.MAX_POINTS, 2))
-                r = _frame.resample(q + "s").mean()
-            else:
-                r = _frame
-            splt1.plot(r.index, r, label=iokindname)
-    splt1.set_xlabel("Timestamp", fontweight='semibold')
-    splt1.set_ylabel("Avg. read rate in MB/s", fontweight='semibold')
-    splt1.set_ylim(bottom=0)
-    splt1.legend()
-
-    # Plot Write Rates
-    splt2.set_title("I/O Write Rate")
-    for iokind in iokinds:
-        iokindname = (f"{iokind['object']}/"
-                      if {iokind['object']} == 'temp relation'
-                      else ""
-                      f"{iokind['backend_type']}/"
-                      f"{iokind['context']}")
-        if not all(numpy.isnan(v) or v == 0
-                   for v in iorates['writes'][iokindname]):
-            # Downsample if needed
-            _frame = DataFrame(
-                data=[round(v / 1048576, 1 if v >= 100 else 2)
-                      for v in iorates['writes'][iokindname]],
-                index=tstamps, copy=False)
-            if len(tstamps) > plot.MAX_POINTS:
-                q = str(round(
-                    (tstamps[-1] - tstamps[0]).total_seconds()
-                    / plot.MAX_POINTS, 2))
-                r = _frame.resample(q + "s").mean()
-            else:
-                r = _frame
-            splt2.plot(r.index, r, label=iokindname)
-    splt2.set_xlabel("Timestamp", fontweight='semibold')
-    splt2.set_ylabel("Avg. write rate in MB/s", fontweight='semibold')
-    splt2.legend()
-    splt2.set_ylim(bottom=0)
-
+    plot_iokinds(splt1, iorates['read'], tstamps, "I/O Read Rate",
+                 "Avg. read rate in {}/s")
+    plot_iokinds(splt2, iorates['write'], tstamps, "I/O Write Rate",
+                 "Avg. write rate in {}/s")
     plt.gcf().autofmt_xdate()
     fig.tight_layout()
     outfile = f"""{
@@ -284,6 +159,7 @@ def io(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                            "Default to [HEALTHY].",
         outfile=outfile,
         info=info,
+        settings=settings,
     )
 
     finalize_module_report(outputdir, info, port, 'io',
@@ -291,142 +167,94 @@ def io(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     mpclose('all')
 
 
-# Gather I/O stats and convert to bytes
+# Gather I/O stats in bytes: for reads and writes, a list per I/O kind with
+# one value per snapshot. A kind missing from a snapshot has done no I/O yet.
 def calc_iostats(data, blcksz=8192):
-    iostats = [io['io_stats'] for io in data]
-    iokinds = []
-    for snapshot in iostats:
-        for entry in snapshot:
-            # PG18+ has read_bytes/write_bytes columns,
-            # older versions need conversion
-            if 'read_bytes' in entry:
-                r = entry['read_bytes']
-                if r:
-                    entry['reads'] = int(r)
+    iostats = {'read': {}, 'write': {}}
+    for i, snapshot in enumerate(data):
+        for entry in snapshot['io_stats']:
+            name = iokind_name(entry)
+            for rw in iostats:
+                if name not in iostats[rw]:
+                    iostats[rw][name] = [0] * len(data)
+                iostats[rw][name][i] = iobytes(entry, rw, blcksz)
+    return iostats
+
+
+# Calculate I/O rates in bytes/s
+def calc_iorates(data, iostats):
+
+    # I/O diff generator - yields list of rates in bytes/s
+    def iodiff(values):
+        yield numpy.nan
+        for i in range(len(data) - 1):
+            if data[i + 1]['stats_reset'] == data[i]['stats_reset']:
+                s = (data[i + 1]['snapshot_tstamp']
+                     - data[i]['snapshot_tstamp']).total_seconds()
+                yield (values[i + 1] - values[i]) / s
             else:
-                r = entry['reads']
-                if r:
-                    entry['reads'] = int(r) * blcksz
-
-            if 'write_bytes' in entry:
-                w = entry['write_bytes']
-                if w:
-                    entry['writes'] = int(w)
-            else:
-                w = entry['writes']
-                if w:
-                    entry['writes'] = int(w) * blcksz
-
-            iokind = {'backend_type': entry['backend_type'],
-                      'object': entry['object'],
-                      'context': entry['context']}
-            if iokind not in iokinds:
-                iokinds += iokind,
-    return iostats, iokinds
-
-
-# Calculate I/O rates
-def calc_iorates(data, iokinds, blcksz=8192):
+                yield numpy.nan
 
     rates = {}
-
-    # I/O diff generator - yields tuple list of I/O rates in bytes/s
-    def iodiff(data, iokind, rw):
-        yield numpy.nan
-        for i, item in enumerate(data):
-            if i + 1 < len(data):
-                if (data[i + 1]['stats_reset'] == data[i]['stats_reset']):
-                    s = ((data[i + 1]['snapshot_tstamp']
-                         - data[i]['snapshot_tstamp'])
-                         .total_seconds())
-                    v1, v2 = 0, 0
-                    # PG18+ has read_bytes/write_bytes columns
-                    rw_bytes = f"{rw[:-1]}_bytes"
-                    for entry in data[i]['io_stats']:
-                        if {'backend_type': entry['backend_type'],
-                                'object': entry['object'],
-                                'context': entry['context']} == iokind:
-                            if rw_bytes in entry:
-                                v1 = entry[rw_bytes]
-                            elif rw in entry:
-                                v1 = entry[rw]
-                                if v1:
-                                    v1 = int(v1) * blcksz
-                    for entry in data[i + 1]['io_stats']:
-                        if {'backend_type': entry['backend_type'],
-                                'object': entry['object'],
-                                'context': entry['context']} == iokind:
-                            if rw_bytes in entry:
-                                v2 = entry[rw_bytes]
-                            elif rw in entry:
-                                v2 = entry[rw]
-                                if v2:
-                                    v2 = int(v2) * blcksz
-                    yield (v2 - v1) / s if v1 else numpy.nan
-                else:
-                    yield numpy.nan
-
-    for rw in ['reads', 'writes']:
+    for rw in iostats:
         rates[rw] = {}
-        for iokind in iokinds:
-            rates[rw][f"{iokind['object']}/"
-                      if {iokind['object']} == 'temp relation'
-                      else ""
-                      f"{iokind['backend_type']}/"
-                      f"{iokind['context']}"] = list(iodiff(data, iokind, rw))
+        for name, values in iostats[rw].items():
+            rates[rw][name] = list(iodiff(values))
     return rates
 
 
-# Build a flattened DataFrame from I/O stats for AI analysis
-def build_io_dataframe(iostats, iokinds, tstamps):
-    data = {}
-    for iokind in iokinds:
-        kindname = (f"{iokind['object']}/"
-                    if {iokind['object']} == 'temp relation'
-                    else ""
-                    f"{iokind['backend_type']}/"
-                    f"{iokind['context']}")
-        reads = []
-        writes = []
-        for snapshot in iostats:
-            found = False
-            for entry in snapshot:
-                if {'backend_type': entry['backend_type'],
-                        'object': entry['object'],
-                        'context': entry['context']} == iokind:
-                    found = True
-                    r = entry.get('reads', 0) or 0
-                    w = entry.get('writes', 0) or 0
-                    reads.append(round(r / 1073741824, 2))
-                    writes.append(round(w / 1073741824, 2))
-                    break
-            if not found:
-                reads.append(0)
-                writes.append(0)
-        if not all(v == 0 for v in reads):
-            data[f"{kindname}_read_GB"] = reads
-        if not all(v == 0 for v in writes):
-            data[f"{kindname}_write_GB"] = writes
-    return DataFrame(data=data, index=tstamps, copy=False)
+# Bytes read or written: PG18+ reports them, older releases count blocks.
+# NULL, where the operation does not apply to the I/O kind, counts as 0
+def iobytes(entry, rw, blcksz):
+    if f"{rw}_bytes" in entry:
+        return int(entry[f"{rw}_bytes"] or 0)
+    return int(entry[f"{rw}s"] or 0) * blcksz
 
 
-# Build a flattened DataFrame from I/O rates for AI analysis
-def build_iorate_dataframe(iorates, iokinds, tstamps):
+# Chart label of an I/O kind, naming the object unless it is a relation
+def iokind_name(iokind):
+    prefix = '' if iokind['object'] == 'relation' else f"{iokind['object']}/"
+    return f"{prefix}{iokind['backend_type']}/{iokind['context']}"
+
+
+# Plot each I/O kind with a non-zero value, in the largest unit from KB to TB
+# in which the biggest value is at least 1
+def plot_iokinds(splt, series, tstamps, title, ylabel):
+    biggest = 0
+    for values in series.values():
+        biggest = numpy.nanmax([biggest, *values])
+    unit, size = 'KB', 1024
+    for u, power in (('MB', 2), ('GB', 3), ('TB', 4)):
+        if biggest >= 1024 ** power:
+            unit, size = u, 1024 ** power
+    for name, values in series.items():
+        if not all(numpy.isnan(v) or v == 0 for v in values):
+            # Downsample if needed
+            _frame = DataFrame(data=[v / size for v in values],
+                               index=tstamps, copy=False)
+            if len(tstamps) > plot.MAX_POINTS:
+                q = str(round(
+                    (tstamps[-1] - tstamps[0]).total_seconds()
+                    / plot.MAX_POINTS, 2))
+                r = _frame.resample(q + "s").mean()
+            else:
+                r = _frame
+            splt.plot(r.index, r, label=name)
+    splt.set_title(title)
+    splt.set_xlabel("Timestamp", fontweight='semibold')
+    splt.set_ylabel(ylabel.format(unit), fontweight='semibold')
+    splt.set_ylim(bottom=0)
+    splt.legend()
+
+
+# Build a flattened DataFrame of reads and writes per I/O kind for AI
+# analysis, leaving out the series that stay zero
+def build_io_dataframe(series, size, unit, tstamps):
     data = {}
-    for iokind in iokinds:
-        kindname = (f"{iokind['object']}/"
-                    if {iokind['object']} == 'temp relation'
-                    else ""
-                    f"{iokind['backend_type']}/"
-                    f"{iokind['context']}")
-        if kindname in iorates['reads']:
-            reads = [round(v / 1048576, 2) if not numpy.isnan(v) else 0
-                     for v in iorates['reads'][kindname]]
-            if not all(v == 0 for v in reads):
-                data[f"{kindname}_read_MBps"] = reads
-        if kindname in iorates['writes']:
-            writes = [round(v / 1048576, 2) if not numpy.isnan(v) else 0
-                      for v in iorates['writes'][kindname]]
-            if not all(v == 0 for v in writes):
-                data[f"{kindname}_write_MBps"] = writes
+    for rw in series:
+        for name, values in series[rw].items():
+            column = [0 if numpy.isnan(v) else round(v / size, 2)
+                      for v in values]
+            if any(column):
+                data[f"{name}_{rw}_{unit}"] = column
     return DataFrame(data=data, index=tstamps, copy=False)

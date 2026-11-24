@@ -90,7 +90,8 @@ def wal(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     walgb = calc_wal(data)
     walrates = calc_walrates(data)
     settings = get_settings(conn, ['max_wal_size', 'max_wal_senders',
-                                   'max_replication_slots'])
+                                   'max_replication_slots', 'wal_compression',
+                                   'full_page_writes'])
 
     # Downsample if needed
     walgb_frame = DataFrame(data=walgb, index=tstamps, copy=False)

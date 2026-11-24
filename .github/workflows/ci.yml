@@ -56,7 +56,7 @@ jobs:
             - name: Install PostgreSQL ${{ matrix.pg_version }}
               run: |
                   wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg
-                  echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main 19" | sudo tee /etc/apt/sources.list.d/pgdg.list
+                  echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
                   sudo apt-get update
                   sudo apt-get install -y postgresql-${{ matrix.pg_version }} postgresql-server-dev-${{ matrix.pg_version }}
 
@@ -117,7 +117,7 @@ jobs:
             - name: Install PostgreSQL ${{ matrix.pg_version }}
               run: |
                   wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg
-                  echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main 19" | sudo tee /etc/apt/sources.list.d/pgdg.list
+                  echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
                   sudo apt-get update
                   sudo apt-get install -y postgresql-${{ matrix.pg_version }}
 
@@ -158,7 +158,7 @@ jobs:
                   if [ ${{ matrix.pg_version }} -ge 15 ]; then
                       sudo -u postgres psql -d testdb -c 'CREATE PUBLICATION dummy_pub FOR TABLES IN SCHEMA pgstatviz;'
                   else
-                      sudo -u postgres psql -d testdb -c 'CREATE PUBLICATION dummy_pub FOR TABLE pgstatviz.snapshots, pgstatviz.buf, pgstatviz.conf, pgstatviz.conn, pgstatviz.db, pgstatviz.io, pgstatviz.lock, pgstatviz.repl, pgstatviz.slru, pgstatviz.wait, pgstatviz.wal;'
+                      sudo -u postgres psql -d testdb -c 'CREATE PUBLICATION dummy_pub FOR TABLE pgstatviz.snapshots, pgstatviz.buf, pgstatviz.conf, pgstatviz.conn, pgstatviz.db, pgstatviz.io, pgstatviz.lock, pgstatviz.blocking, pgstatviz.lockwait, pgstatviz.repl, pgstatviz.slru, pgstatviz.wait, pgstatviz.wal;'
                   fi
                   sudo -u postgres psql -d dummydb -c "CREATE EXTENSION pg_statviz;"
                   sudo -u postgres psql -d testdb -c "SELECT pg_create_logical_replication_slot('dummy_sub', 'pgoutput');"
@@ -176,6 +176,30 @@ jobs:
                       sleep 2
                   done
 
+            - name: Force a lock wait between two snapshots
+              if: matrix.pg_version >= 19
+              run: |
+                  sudo -u postgres psql -d testdb -c 'CREATE TABLE lockwait_probe (i int);'
+                  # Hold the lock until the reader below waits for it, then longer than its deadlock_timeout
+                  sudo -u postgres psql -d testdb > /dev/null <<'SQL' &
+                  BEGIN;
+                  LOCK TABLE lockwait_probe;
+                  DO $$BEGIN
+                      FOR i IN 1..200 LOOP
+                          EXIT WHEN EXISTS (SELECT FROM pg_locks WHERE relation = 'lockwait_probe'::regclass AND NOT granted);
+                          PERFORM pg_sleep(0.05);
+                      END LOOP;
+                  END$$;
+                  SELECT pg_sleep(0.5);
+                  COMMIT;
+                  SQL
+                  # Wait until the background session holds the lock
+                  for i in $(seq 50); do sudo -u postgres psql -d testdb -tAc "SELECT 1 FROM pg_locks WHERE relation = 'lockwait_probe'::regclass AND granted" | grep -q 1 && break; sleep 0.1; done
+                  sudo -u postgres psql -d testdb -c 'SET deadlock_timeout = 100; SELECT count(*) FROM lockwait_probe; SELECT pg_stat_force_next_flush();' > /dev/null
+                  wait
+                  sudo -u postgres psql -d testdb -c "SELECT pgstatviz.snapshot();"
+                  test "$(sudo -u postgres psql -d testdb -tAc "SELECT coalesce(sum((e->>'waits')::int) FILTER (WHERE l.snapshot_tstamp = m.newest), 0) > coalesce(sum((e->>'waits')::int) FILTER (WHERE l.snapshot_tstamp = m.oldest), 0) FROM pgstatviz.lockwait l CROSS JOIN LATERAL jsonb_array_elements(l.lockwait_stats) e CROSS JOIN (SELECT min(snapshot_tstamp) AS oldest, max(snapshot_tstamp) AS newest FROM pgstatviz.lockwait) m WHERE e->>'locktype' = 'relation'")" = t
+
             - name: Install Python package
               run: |
                   sudo pip install .
@@ -192,6 +216,10 @@ jobs:
                   ls -lh /tmp/output/
                   if [ $(ls /tmp/output/*.png 2>/dev/null | wc -l) -lt 1 ]; then
                       echo "ERROR: No visualization files generated"
+                      exit 1
+                  fi
+                  if [ ${{ matrix.pg_version }} -ge 19 ] && ! ls /tmp/output/*_lockwait.png > /dev/null 2>&1; then
+                      echo "ERROR: Lock wait chart not generated"
                       exit 1
                   fi
                   echo "✓ Visualization files generated"
