@@ -32,78 +32,73 @@ CREATE TABLE IF NOT EXISTS @extschema@.buf(
     stats_reset timestamptz);
 
 -- PG17+ moved things out of pg_stat_bgwriter
-DO $block$
-BEGIN
-    IF (SELECT current_setting('server_version_num')::int >= 170000) THEN
-        CREATE OR REPLACE FUNCTION @extschema@.snapshot_buf(snapshot_tstamp timestamptz)
-        RETURNS void
-        AS $$
-            INSERT INTO @extschema@.buf (
-                snapshot_tstamp,
-                checkpoints_timed,
-                checkpoints_req,
-                checkpoint_write_time,
-                checkpoint_sync_time,
-                buffers_checkpoint,
-                buffers_clean,
-                maxwritten_clean,
-                buffers_backend,
-                buffers_backend_fsync,
-                buffers_alloc,
-                stats_reset)
-            SELECT
-                snapshot_tstamp,
-                c.num_timed,
-                c.num_requested,
-                c.write_time,
-                c.sync_time,
-                c.buffers_written,
-                b.buffers_clean,
-                b.maxwritten_clean,
-                i.writes,
-                i.fsyncs,
-                b.buffers_alloc,
-                b.stats_reset
-            FROM pg_stat_bgwriter b, pg_stat_checkpointer c, pg_stat_io i
-            WHERE i.backend_type = 'client backend'
-            AND i.context = 'normal'
-            AND i.object = 'relation';
-        $$ LANGUAGE SQL;
-    ELSE
-        CREATE OR REPLACE FUNCTION @extschema@.snapshot_buf(snapshot_tstamp timestamptz)
-        RETURNS void
-        AS $$
-            INSERT INTO @extschema@.buf (
-                snapshot_tstamp,
-                checkpoints_timed,
-                checkpoints_req,
-                checkpoint_write_time,
-                checkpoint_sync_time,
-                buffers_checkpoint,
-                buffers_clean,
-                maxwritten_clean,
-                buffers_backend,
-                buffers_backend_fsync,
-                buffers_alloc,
-                stats_reset)
-            SELECT
-                snapshot_tstamp,
-                checkpoints_timed,
-                checkpoints_req,
-                checkpoint_write_time,
-                checkpoint_sync_time,
-                buffers_checkpoint,
-                buffers_clean,
-                maxwritten_clean,
-                buffers_backend,
-                buffers_backend_fsync,
-                buffers_alloc,
-                stats_reset
-            FROM pg_stat_bgwriter;
-        $$ LANGUAGE SQL;
-    END IF;
-END
-$block$ LANGUAGE PLPGSQL;
+CREATE OR REPLACE FUNCTION @extschema@.snapshot_buf_pg17(snapshot_tstamp timestamptz)
+RETURNS void
+AS $$
+    INSERT INTO @extschema@.buf (
+        snapshot_tstamp,
+        checkpoints_timed,
+        checkpoints_req,
+        checkpoint_write_time,
+        checkpoint_sync_time,
+        buffers_checkpoint,
+        buffers_clean,
+        maxwritten_clean,
+        buffers_backend,
+        buffers_backend_fsync,
+        buffers_alloc,
+        stats_reset)
+    SELECT
+        snapshot_tstamp,
+        c.num_timed,
+        c.num_requested,
+        c.write_time,
+        c.sync_time,
+        c.buffers_written,
+        b.buffers_clean,
+        b.maxwritten_clean,
+        i.writes,
+        i.fsyncs,
+        b.buffers_alloc,
+        b.stats_reset
+    FROM pg_stat_bgwriter b, pg_stat_checkpointer c, pg_stat_io i
+    WHERE i.backend_type = 'client backend'
+    AND i.context = 'normal'
+    AND i.object = 'relation';
+$$ LANGUAGE SQL;
+
+-- PG13-16 have them all in pg_stat_bgwriter
+CREATE OR REPLACE FUNCTION @extschema@.snapshot_buf_pg13(snapshot_tstamp timestamptz)
+RETURNS void
+AS $$
+    INSERT INTO @extschema@.buf (
+        snapshot_tstamp,
+        checkpoints_timed,
+        checkpoints_req,
+        checkpoint_write_time,
+        checkpoint_sync_time,
+        buffers_checkpoint,
+        buffers_clean,
+        maxwritten_clean,
+        buffers_backend,
+        buffers_backend_fsync,
+        buffers_alloc,
+        stats_reset)
+    SELECT
+        snapshot_tstamp,
+        checkpoints_timed,
+        checkpoints_req,
+        checkpoint_write_time,
+        checkpoint_sync_time,
+        buffers_checkpoint,
+        buffers_clean,
+        maxwritten_clean,
+        buffers_backend,
+        buffers_backend_fsync,
+        buffers_alloc,
+        stats_reset
+    FROM pg_stat_bgwriter;
+$$ LANGUAGE SQL;
 
 
 -- Configuration
@@ -340,31 +335,35 @@ CREATE TABLE IF NOT EXISTS @extschema@.lockwait(
     stats_reset timestamptz);
 
 -- pg_stat_lock only exists in PG19+
-DO $block$
-BEGIN
-    IF (SELECT current_setting('server_version_num')::int >= 190000) THEN
-        CREATE OR REPLACE FUNCTION @extschema@.snapshot_lockwait(snapshot_tstamp timestamptz)
-        RETURNS void
-        AS $$
-            INSERT INTO @extschema@.lockwait (
-                snapshot_tstamp,
-                lockwait_stats,
-                stats_reset)
+CREATE OR REPLACE FUNCTION @extschema@.snapshot_lockwait(snapshot_tstamp timestamptz)
+RETURNS void
+AS $$
+    WITH
+        pgsl AS (
             SELECT
-                snapshot_tstamp,
-                -- lock types whose counters are all zero are left out
-                (SELECT coalesce(jsonb_agg(jsonb_build_object(
-                            'locktype', locktype,
-                            'waits', waits,
-                            'wait_time', wait_time,
-                            'fastpath_exceeded', fastpath_exceeded)), '[]')
-                    FROM pg_stat_lock
-                    WHERE waits > 0 OR wait_time > 0 OR fastpath_exceeded > 0),
-                (SELECT max(stats_reset) FROM pg_stat_lock);
-        $$ LANGUAGE SQL;
-    END IF;
-END
-$block$ LANGUAGE PLPGSQL;
+                locktype,
+                waits,
+                wait_time,
+                fastpath_exceeded,
+                stats_reset
+            FROM pg_stat_lock)
+    INSERT INTO @extschema@.lockwait (
+        snapshot_tstamp,
+        lockwait_stats,
+        stats_reset)
+    SELECT
+        snapshot_tstamp,
+        -- lock types whose counters are all zero are left out
+        (SELECT coalesce(jsonb_agg(jsonb_build_object(
+                    'locktype', locktype,
+                    'waits', waits,
+                    'wait_time', wait_time,
+                    'fastpath_exceeded', fastpath_exceeded)), '[]')
+            FROM pgsl
+            WHERE waits > 0 OR wait_time > 0 OR fastpath_exceeded > 0),
+        -- from every lock type, so it is recorded when none has waited
+        (SELECT max(stats_reset) FROM pgsl);
+$$ LANGUAGE SQL;
 
 
 -- Replication
@@ -488,105 +487,98 @@ CREATE TABLE IF NOT EXISTS @extschema@.wal(
     wal_sync_time double precision,
     stats_reset timestamptz);
 
--- pg_stat_wal only exists in PG14+
-DO $block$
-BEGIN
-    IF (SELECT current_setting('server_version_num')::int >= 190000) THEN
-        -- PG19 adds wal_fpi_bytes to pg_stat_wal
-        CREATE OR REPLACE FUNCTION @extschema@.snapshot_wal(snapshot_tstamp timestamptz)
-        RETURNS void
-        AS $$
-            INSERT INTO @extschema@.wal (
-                    snapshot_tstamp,
-                    wal_records,
-                    wal_fpi,
-                    wal_fpi_bytes,
-                    wal_bytes,
-                    wal_buffers_full,
-                    wal_write,
-                    wal_sync,
-                    wal_write_time,
-                    wal_sync_time,
-                    stats_reset)
-                SELECT
-                    snapshot_tstamp,
-                    w.wal_records,
-                    w.wal_fpi,
-                    w.wal_fpi_bytes,
-                    w.wal_bytes,
-                    w.wal_buffers_full,
-                    SUM(io.writes),
-                    SUM(io.fsyncs),
-                    SUM(io.write_time),
-                    SUM(io.fsync_time),
-                    w.stats_reset
-                FROM pg_stat_wal w, pg_stat_io io
-                WHERE io.object = 'wal'
-                GROUP BY w.wal_records, w.wal_fpi, w.wal_fpi_bytes, w.wal_bytes, w.wal_buffers_full, w.stats_reset;
-        $$ LANGUAGE SQL;
-    ELSIF (SELECT current_setting('server_version_num')::int >= 180000) THEN
-        -- PG18 moved wal_write/wal_sync statistics to pg_stat_io (object = 'wal')
-        CREATE OR REPLACE FUNCTION @extschema@.snapshot_wal(snapshot_tstamp timestamptz)
-        RETURNS void
-        AS $$
-            INSERT INTO @extschema@.wal (
-                    snapshot_tstamp,
-                    wal_records,
-                    wal_fpi,
-                    wal_bytes,
-                    wal_buffers_full,
-                    wal_write,
-                    wal_sync,
-                    wal_write_time,
-                    wal_sync_time,
-                    stats_reset)
-                SELECT
-                    snapshot_tstamp,
-                    w.wal_records,
-                    w.wal_fpi,
-                    w.wal_bytes,
-                    w.wal_buffers_full,
-                    SUM(io.writes),
-                    SUM(io.fsyncs),
-                    SUM(io.write_time),
-                    SUM(io.fsync_time),
-                    w.stats_reset
-                FROM pg_stat_wal w, pg_stat_io io
-                WHERE io.object = 'wal'
-                GROUP BY w.wal_records, w.wal_fpi, w.wal_bytes, w.wal_buffers_full, w.stats_reset;
-        $$ LANGUAGE SQL;
-    ELSIF (SELECT current_setting('server_version_num')::int >= 140000) THEN
-        -- PG14-17 has all WAL stats in pg_stat_wal
-        CREATE OR REPLACE FUNCTION @extschema@.snapshot_wal(snapshot_tstamp timestamptz)
-        RETURNS void
-        AS $$
-            INSERT INTO @extschema@.wal (
-                    snapshot_tstamp,
-                    wal_records,
-                    wal_fpi,
-                    wal_bytes,
-                    wal_buffers_full,
-                    wal_write,
-                    wal_sync,
-                    wal_write_time,
-                    wal_sync_time,
-                    stats_reset)
-                SELECT
-                    snapshot_tstamp,
-                    wal_records,
-                    wal_fpi,
-                    wal_bytes,
-                    wal_buffers_full,
-                    wal_write,
-                    wal_sync,
-                    wal_write_time,
-                    wal_sync_time,
-                    stats_reset
-                FROM pg_stat_wal;
-        $$ LANGUAGE SQL;
-    END IF;
-END
-$block$ LANGUAGE PLPGSQL;
+-- PG19 adds wal_fpi_bytes to pg_stat_wal
+CREATE OR REPLACE FUNCTION @extschema@.snapshot_wal_pg19(snapshot_tstamp timestamptz)
+RETURNS void
+AS $$
+    INSERT INTO @extschema@.wal (
+            snapshot_tstamp,
+            wal_records,
+            wal_fpi,
+            wal_fpi_bytes,
+            wal_bytes,
+            wal_buffers_full,
+            wal_write,
+            wal_sync,
+            wal_write_time,
+            wal_sync_time,
+            stats_reset)
+        SELECT
+            snapshot_tstamp,
+            w.wal_records,
+            w.wal_fpi,
+            w.wal_fpi_bytes,
+            w.wal_bytes,
+            w.wal_buffers_full,
+            SUM(io.writes),
+            SUM(io.fsyncs),
+            SUM(io.write_time),
+            SUM(io.fsync_time),
+            w.stats_reset
+        FROM pg_stat_wal w, pg_stat_io io
+        WHERE io.object = 'wal'
+        GROUP BY w.wal_records, w.wal_fpi, w.wal_fpi_bytes, w.wal_bytes, w.wal_buffers_full, w.stats_reset;
+$$ LANGUAGE SQL;
+
+-- PG18 moved wal_write/wal_sync statistics to pg_stat_io (object = 'wal')
+CREATE OR REPLACE FUNCTION @extschema@.snapshot_wal_pg18(snapshot_tstamp timestamptz)
+RETURNS void
+AS $$
+    INSERT INTO @extschema@.wal (
+            snapshot_tstamp,
+            wal_records,
+            wal_fpi,
+            wal_bytes,
+            wal_buffers_full,
+            wal_write,
+            wal_sync,
+            wal_write_time,
+            wal_sync_time,
+            stats_reset)
+        SELECT
+            snapshot_tstamp,
+            w.wal_records,
+            w.wal_fpi,
+            w.wal_bytes,
+            w.wal_buffers_full,
+            SUM(io.writes),
+            SUM(io.fsyncs),
+            SUM(io.write_time),
+            SUM(io.fsync_time),
+            w.stats_reset
+        FROM pg_stat_wal w, pg_stat_io io
+        WHERE io.object = 'wal'
+        GROUP BY w.wal_records, w.wal_fpi, w.wal_bytes, w.wal_buffers_full, w.stats_reset;
+$$ LANGUAGE SQL;
+
+-- PG14-17 has all WAL stats in pg_stat_wal
+CREATE OR REPLACE FUNCTION @extschema@.snapshot_wal_pg14(snapshot_tstamp timestamptz)
+RETURNS void
+AS $$
+    INSERT INTO @extschema@.wal (
+            snapshot_tstamp,
+            wal_records,
+            wal_fpi,
+            wal_bytes,
+            wal_buffers_full,
+            wal_write,
+            wal_sync,
+            wal_write_time,
+            wal_sync_time,
+            stats_reset)
+        SELECT
+            snapshot_tstamp,
+            wal_records,
+            wal_fpi,
+            wal_bytes,
+            wal_buffers_full,
+            wal_write,
+            wal_sync,
+            wal_write_time,
+            wal_sync_time,
+            stats_reset
+        FROM pg_stat_wal;
+$$ LANGUAGE SQL;
 
 
 -- DB
@@ -659,93 +651,86 @@ CREATE TABLE IF NOT EXISTS @extschema@.io(
     io_stats jsonb,
     stats_reset timestamptz);
 
--- pg_stat_io only exists in PG16+
-DO $block$
-BEGIN
-    IF (SELECT current_setting('server_version_num')::int >= 180000) THEN
-        -- PG18+ uses byte-based metrics (read_bytes, write_bytes, extend_bytes)
-        CREATE OR REPLACE FUNCTION @extschema@.snapshot_io(snapshot_tstamp timestamptz)
-        RETURNS void
-        AS $$
-            WITH
-                pgsi AS (
-                    SELECT
-                        backend_type,
-                        object,
-                        context,
-                        reads,
-                        read_time,
-                        read_bytes,
-                        writes,
-                        write_time,
-                        write_bytes,
-                        writebacks,
-                        writeback_time,
-                        extends,
-                        extend_time,
-                        extend_bytes,
-                        hits,
-                        evictions,
-                        reuses,
-                        fsyncs,
-                        fsync_time,
-                        stats_reset
-                    FROM pg_stat_io
-                    WHERE NOT (reads = 0 AND writes = 0)),
-                ioagg AS (
-                    SELECT jsonb_agg(io)
-                    FROM (SELECT *
-                          FROM pgsi) io)
-            INSERT INTO @extschema@.io (
-                    snapshot_tstamp,
-                    io_stats,
-                    stats_reset)
-            SELECT snapshot_tstamp,
-                   (SELECT * FROM ioagg) AS io_stats,
-                   (SELECT stats_reset FROM pgsi LIMIT 1) AS stats_reset;
-        $$ LANGUAGE SQL;
-    ELSIF (SELECT current_setting('server_version_num')::int >= 160000) THEN
-        -- PG16-17 uses operation counts without byte metrics
-        CREATE OR REPLACE FUNCTION @extschema@.snapshot_io(snapshot_tstamp timestamptz)
-        RETURNS void
-        AS $$
-            WITH
-                pgsi AS (
-                    SELECT
-                        backend_type,
-                        object,
-                        context,
-                        reads,
-                        read_time,
-                        writes,
-                        write_time,
-                        writebacks,
-                        writeback_time,
-                        extends,
-                        extend_time,
-                        hits,
-                        evictions,
-                        reuses,
-                        fsyncs,
-                        fsync_time,
-                        stats_reset
-                    FROM pg_stat_io
-                    WHERE NOT (reads = 0 AND writes = 0)),
-                ioagg AS (
-                    SELECT jsonb_agg(io)
-                    FROM (SELECT *
-                          FROM pgsi) io)
-            INSERT INTO @extschema@.io (
-                    snapshot_tstamp,
-                    io_stats,
-                    stats_reset)
-            SELECT snapshot_tstamp,
-                   (SELECT * FROM ioagg) AS io_stats,
-                   (SELECT stats_reset FROM pgsi LIMIT 1) AS stats_reset;
-        $$ LANGUAGE SQL;
-    END IF;
-END
-$block$ LANGUAGE PLPGSQL;
+-- PG18+ uses byte-based metrics (read_bytes, write_bytes, extend_bytes)
+CREATE OR REPLACE FUNCTION @extschema@.snapshot_io_pg18(snapshot_tstamp timestamptz)
+RETURNS void
+AS $$
+    WITH
+        pgsi AS (
+            SELECT
+                backend_type,
+                object,
+                context,
+                reads,
+                read_time,
+                read_bytes,
+                writes,
+                write_time,
+                write_bytes,
+                writebacks,
+                writeback_time,
+                extends,
+                extend_time,
+                extend_bytes,
+                hits,
+                evictions,
+                reuses,
+                fsyncs,
+                fsync_time,
+                stats_reset
+            FROM pg_stat_io
+            WHERE NOT (reads = 0 AND writes = 0)),
+        ioagg AS (
+            SELECT jsonb_agg(io)
+            FROM (SELECT *
+                  FROM pgsi) io)
+    INSERT INTO @extschema@.io (
+            snapshot_tstamp,
+            io_stats,
+            stats_reset)
+    SELECT snapshot_tstamp,
+           (SELECT * FROM ioagg) AS io_stats,
+           (SELECT stats_reset FROM pgsi LIMIT 1) AS stats_reset;
+$$ LANGUAGE SQL;
+
+-- PG16-17 uses operation counts without byte metrics
+CREATE OR REPLACE FUNCTION @extschema@.snapshot_io_pg16(snapshot_tstamp timestamptz)
+RETURNS void
+AS $$
+    WITH
+        pgsi AS (
+            SELECT
+                backend_type,
+                object,
+                context,
+                reads,
+                read_time,
+                writes,
+                write_time,
+                writebacks,
+                writeback_time,
+                extends,
+                extend_time,
+                hits,
+                evictions,
+                reuses,
+                fsyncs,
+                fsync_time,
+                stats_reset
+            FROM pg_stat_io
+            WHERE NOT (reads = 0 AND writes = 0)),
+        ioagg AS (
+            SELECT jsonb_agg(io)
+            FROM (SELECT *
+                  FROM pgsi) io)
+    INSERT INTO @extschema@.io (
+            snapshot_tstamp,
+            io_stats,
+            stats_reset)
+    SELECT snapshot_tstamp,
+           (SELECT * FROM ioagg) AS io_stats,
+           (SELECT stats_reset FROM pgsi LIMIT 1) AS stats_reset;
+$$ LANGUAGE SQL;
 
 
 -- Snapshots
@@ -757,13 +742,21 @@ AS $$
         ts := clock_timestamp();
         INSERT INTO @extschema@.snapshots
         VALUES (ts);
-        PERFORM @extschema@.snapshot_buf(ts);
+        -- Stats that differ between server versions have a function for each
+        -- version, all created on every version so they exist after pg_upgrade
+        IF (SELECT current_setting('server_version_num')::int >= 170000) THEN
+            PERFORM @extschema@.snapshot_buf_pg17(ts);
+        ELSE
+            PERFORM @extschema@.snapshot_buf_pg13(ts);
+        END IF;
         PERFORM @extschema@.snapshot_conf(ts);
         PERFORM @extschema@.snapshot_conn(ts);
         PERFORM @extschema@.snapshot_db(ts);
         -- pg_stat_io only exists in PG16+
-        IF (SELECT current_setting('server_version_num')::int >= 160000) THEN
-            PERFORM @extschema@.snapshot_io(ts);
+        IF (SELECT current_setting('server_version_num')::int >= 180000) THEN
+            PERFORM @extschema@.snapshot_io_pg18(ts);
+        ELSIF (SELECT current_setting('server_version_num')::int >= 160000) THEN
+            PERFORM @extschema@.snapshot_io_pg16(ts);
         END IF;
         PERFORM @extschema@.snapshot_lock(ts);
         PERFORM @extschema@.snapshot_blocking(ts);
@@ -775,8 +768,12 @@ AS $$
         PERFORM @extschema@.snapshot_slru(ts);
         PERFORM @extschema@.snapshot_wait(ts);
         -- pg_stat_wal only exists in PG14+
-        IF (SELECT current_setting('server_version_num')::int >= 140000) THEN
-            PERFORM @extschema@.snapshot_wal(ts);
+        IF (SELECT current_setting('server_version_num')::int >= 190000) THEN
+            PERFORM @extschema@.snapshot_wal_pg19(ts);
+        ELSIF (SELECT current_setting('server_version_num')::int >= 180000) THEN
+            PERFORM @extschema@.snapshot_wal_pg18(ts);
+        ELSIF (SELECT current_setting('server_version_num')::int >= 140000) THEN
+            PERFORM @extschema@.snapshot_wal_pg14(ts);
         END IF;
         RAISE NOTICE 'created pg_statviz snapshot';
         RETURN ts;

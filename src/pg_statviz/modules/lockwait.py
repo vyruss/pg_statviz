@@ -86,7 +86,7 @@ def lockwait(*, dbname=getpass.getuser(), host="/var/run/postgresql",
     waits = calc_deltas(data, 'waits')
     wait_time = calc_deltas(data, 'wait_time')
     fastpath = calc_deltas(data, 'fastpath_exceeded')
-    minutes = calc_minutes(waits)
+    minutes = calc_minutes(data)
     findings = calc_findings(waits, wait_time)
     settings = get_settings(conn, ['deadlock_timeout', 'log_lock_waits',
                                    'max_locks_per_transaction'])
@@ -103,7 +103,7 @@ def lockwait(*, dbname=getpass.getuser(), host="/var/run/postgresql",
     avg_wait = calc_avg_wait(waits, wait_time)
     wait_rate = waits.div(minutes, axis=0)
     fastpath_rate = fastpath.div(minutes, axis=0)
-    total = wait_rate.sum(axis=1, min_count=1)
+    total = wait_rate.sum(axis=1).where(minutes.notna())
     waited = [lt for lt in wait_rate.columns if wait_rate[lt].fillna(0).any()]
 
     report_sections = []
@@ -210,22 +210,23 @@ def lockwait(*, dbname=getpass.getuser(), host="/var/run/postgresql",
 
 # Counter increases between consecutive snapshots, one column per lock type.
 # Lock types whose counters are all zero are not stored, so a missing one
-# reads as zero. NaN for the first snapshot and for the first one after a
-# stats reset.
+# reads as zero. NaN where calc_minutes is.
 def calc_deltas(data, field):
     deltas = DataFrame([{s['locktype']: s[field]
                          for s in d['lockwait_stats']} for d in data],
                        index=[d['snapshot_tstamp'] for d in data]
                        ).fillna(0).diff()
-    resets = Series([d['stats_reset'] for d in data])
-    deltas.loc[(resets != resets.shift()).to_numpy()] = nan
+    deltas.loc[calc_minutes(data).isna()] = nan
     return deltas
 
 
-# Minutes between consecutive snapshots, NaN where the deltas are
-def calc_minutes(deltas):
-    minutes = deltas.index.to_series().diff().dt.total_seconds() / 60
-    return minutes.where(deltas.notna().all(axis=1))
+# Minutes between consecutive snapshots, NaN for the first snapshot and for
+# the first one after a stats reset
+def calc_minutes(data):
+    resets = Series([d['stats_reset'] for d in data],
+                    index=[d['snapshot_tstamp'] for d in data])
+    minutes = resets.index.to_series().diff().dt.total_seconds() / 60
+    return minutes.where(resets == resets.shift())
 
 
 # Average milliseconds per wait, NaN where nothing waited

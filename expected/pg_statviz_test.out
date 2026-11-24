@@ -14,11 +14,50 @@ SELECT count(*)
      1
 (1 row)
 
-SELECT (count(*) = 1) = (current_setting('server_version_num')::int >= 190000)
+-- stats_reset is recorded even when no lock type has waited
+SELECT (count(stats_reset) = 1)
+           = (current_setting('server_version_num')::int >= 190000)
     AS lockwait_ok
     FROM pgstatviz.lockwait;
  lockwait_ok 
 -------------
  t
+(1 row)
+
+-- Every function exists on every version, so none is missing after pg_upgrade
+SELECT proname
+    FROM pg_proc
+    WHERE pronamespace = 'pgstatviz'::regnamespace
+    ORDER BY 1;
+      proname      
+-------------------
+ delete_snapshots
+ snapshot
+ snapshot_blocking
+ snapshot_buf_pg13
+ snapshot_buf_pg17
+ snapshot_conf
+ snapshot_conn
+ snapshot_db
+ snapshot_io_pg16
+ snapshot_io_pg18
+ snapshot_lock
+ snapshot_lockwait
+ snapshot_repl
+ snapshot_slru
+ snapshot_wait
+ snapshot_wal_pg14
+ snapshot_wal_pg18
+ snapshot_wal_pg19
+(18 rows)
+
+SELECT (SELECT count(*) = 1 FROM pgstatviz.buf) AS buf_ok,
+       (SELECT count(*) = 1 FROM pgstatviz.io)
+           = (current_setting('server_version_num')::int >= 160000) AS io_ok,
+       (SELECT count(*) = 1 FROM pgstatviz.wal)
+           = (current_setting('server_version_num')::int >= 140000) AS wal_ok;
+ buf_ok | io_ok | wal_ok 
+--------+-------+--------
+ t      | t     | t
 (1 row)
 

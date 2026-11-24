@@ -63,12 +63,10 @@ def test_calc_deltas_is_indexed_by_snapshot_time():
 
 
 def test_calc_minutes_is_interval_length_except_across_resets():
-    assert_columns(calc_minutes(calc_deltas(data, 'waits')).to_frame('m'),
+    assert_columns(calc_minutes(data).to_frame('m'),
                    {'m': [nan, 1, 1, nan, 1]})
-    two = [snapshot(0, first_stats_reset, ('tuple', 0, 0.0, 0)),
-           snapshot(30, first_stats_reset, ('tuple', 3, 900.0, 0))]
-    assert_columns(calc_minutes(calc_deltas(two, 'waits')).to_frame('m'),
-                   {'m': [nan, 0.5]})
+    two = [snapshot(0, first_stats_reset), snapshot(30, first_stats_reset)]
+    assert_columns(calc_minutes(two).to_frame('m'), {'m': [nan, 0.5]})
 
 
 def test_calc_avg_wait_is_time_per_wait_in_each_interval():
@@ -104,6 +102,14 @@ def test_lockwait_charts_waits_and_overflows_per_minute(monkeypatch,
                     'transactionid ms per wait': [nan, nan, 1000, nan, nan]})
     assert_columns(frames['Fast-path Lock Slot Overflows'],
                    {'relation overflows/min': [nan, 60, 0, nan, 30]})
+
+
+def test_lockwait_charts_a_zero_total_when_nothing_waited(monkeypatch,
+                                                          tmp_path):
+    # No lock type is stored, and the stats reset still breaks the line
+    quiet = [snapshot(60 * i, d['stats_reset']) for i, d in enumerate(data)]
+    assert_columns(run_lockwait(quiet, monkeypatch, tmp_path)['Lock Waits'],
+                   {'Total waits/min': [nan, 0, 0, nan, 0]})
 
 
 def test_lockwait_downsampling_weighs_each_wait_equally(monkeypatch,
