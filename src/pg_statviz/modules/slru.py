@@ -101,6 +101,7 @@ def slru(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
     splt1.set_title("SLRU cache hit ratio")
     for name in slru_names:
         hit_ratios = []
+        accessed = False
         for ss in slru_stats:
             if not ss:
                 hit_ratios += 0,
@@ -111,12 +112,13 @@ def slru(*, dbname=getpass.getuser(), host="/var/run/postgresql", port="5432",
                         total = s['blks_hit'] + s['blks_read']
                         if total > 0:
                             hit_ratios += (s['blks_hit'] / total) * 100,
+                            accessed = True
                         else:
                             hit_ratios += 0,
                         found = True
                 if not found:
                     hit_ratios += 0,
-        if not all(c == 0 for c in hit_ratios):
+        if accessed:
             # Downsample if needed
             hr_frame = DataFrame(data={name: hit_ratios}, index=tstamps,
                                  copy=False)
@@ -223,7 +225,7 @@ def build_slru_dataframe(slru_stats, slru_names, tstamps):
                 if not found:
                     hit_ratios.append(0)
                     reads.append(0)
-        if not all(v == 0 for v in hit_ratios):
+        if not all(v == 0 for v in hit_ratios + reads):
             data[f"{name}_hit_ratio"] = hit_ratios
         if not all(v == 0 for v in reads):
             data[f"{name}_blks_read"] = reads

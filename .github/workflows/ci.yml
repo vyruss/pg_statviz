@@ -180,7 +180,19 @@ jobs:
               if: matrix.pg_version >= 19
               run: |
                   sudo -u postgres psql -d testdb -c 'CREATE TABLE lockwait_probe (i int);'
-                  sudo -u postgres psql -d testdb -c 'BEGIN; LOCK TABLE lockwait_probe; SELECT pg_sleep(2); COMMIT;' > /dev/null &
+                  # Hold the lock until the reader below waits for it, then longer than its deadlock_timeout
+                  sudo -u postgres psql -d testdb > /dev/null <<'SQL' &
+                  BEGIN;
+                  LOCK TABLE lockwait_probe;
+                  DO $$BEGIN
+                      FOR i IN 1..200 LOOP
+                          EXIT WHEN EXISTS (SELECT FROM pg_locks WHERE relation = 'lockwait_probe'::regclass AND NOT granted);
+                          PERFORM pg_sleep(0.05);
+                      END LOOP;
+                  END$$;
+                  SELECT pg_sleep(0.5);
+                  COMMIT;
+                  SQL
                   # Wait until the background session holds the lock
                   for i in $(seq 50); do sudo -u postgres psql -d testdb -tAc "SELECT 1 FROM pg_locks WHERE relation = 'lockwait_probe'::regclass AND granted" | grep -q 1 && break; sleep 0.1; done
                   sudo -u postgres psql -d testdb -c 'SET deadlock_timeout = 100; SELECT count(*) FROM lockwait_probe; SELECT pg_stat_force_next_flush();' > /dev/null
